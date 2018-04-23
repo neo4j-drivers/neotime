@@ -5,18 +5,20 @@ The `neotime` module provides advanced ISO-8601 compatible date/time functionali
 TODO
 
 
-## Type overview
+## Module overview
 
-#### class `neotime.Duration`
-> TODO
+The `neotime` module defines classes for working with temporal data.
+These classes comprise a similar set to that provided by the standard library `datetime` module.
+Inspiration has also been drawn from ISO-8601.
 
-#### class `neotime.Date`
-> TODO
+The classes are listed below:
 
-####  class `neotime.Time`
-> TODO
+* [`Duration`](#duration-objects)
+* [`Date`](#date-objects)
+* [`Time`](#time-objects)
+* TODO
 
-In addition, the `neotime` module exports the following constants:
+In addition to these classes, the module also exports several constants:
 
 #### `neotime.MIN_YEAR`
 > The smallest year number available.
@@ -56,6 +58,10 @@ The primary instance attributes and their permitted ranges are listed below.
  `seconds`    | Between -(2<sup>63</sup>) and (2<sup>63</sup> - 1) inclusive
  `subseconds` | Between -0.999,999,999 and +0.999,999,999 inclusive
 
+While _seconds_ and _subseconds_ comprise a single logical value, they are stored separately to ensure no loss of precision.
+The _seconds_ attribute can hold any value within the signed 64-bit integer range and the _subseconds_ value can be any `float` with a zero before the decimal point.
+Both values can be positive or negative but must share the same sign.
+
 Two additional secondary attributes are available, each returning a 3-tuple of derived values.
 These are `years_months_days` and `hours_minutes_seconds`.
 
@@ -71,13 +77,14 @@ These are `years_months_days` and `hours_minutes_seconds`.
  `d1 / f`        | A `Duration` representing `d1` divided by `f`, where `f` is a `float`. Month and day attributes are rounded to the nearest integer, using round-half-to-even.
  `d1 // i`       | A `Duration` representing the floor after `d1` is divided by `i`, where `i` is an `int`.
  `d1 % i`        | A `Duration` representing the remainder after `d1` is divided by `i`, where `i` is an `int`.
- `divmod(d1, i)` | A pair of `Duration` objects representing the floor and remainder after `d1` is divided by `i`, where `i` is an `int`.
+ `divmod(d1,i)`  | A pair of `Duration` objects representing the floor and remainder after `d1` is divided by `i`, where `i` is an `int`.
  `+d1`           | A `Duration` identical to `d1`. 
  `-d1`           | A `Duration` that is the inverse of `d1`. Equivalent to `Duration(months=-d1.months, days=-d1.days, seconds=-d1.seconds, subseconds=-d1.subseconds)`. 
  `abs(d1)`       | A `Duration` equal to the absolute value of `d1`. Equivalent to `Duration(months=abs(d1.months), days=abs(d1.days), seconds=abs(d1.seconds), subseconds=abs(d1.subseconds))`. 
  `str(d1)`       | 
  `repr(d1)`      | 
  `bool(d1)`      | `True` if any attribute is non-zero, `False` otherwise. 
+ `tuple(d1)`     | A 4-tuple of `(months: int, days: int, seconds: int, subseconds: float)`. 
 
 
 ## ``Date`` objects
