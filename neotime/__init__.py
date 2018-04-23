@@ -20,6 +20,7 @@
 a number of utility functions.
 """
 
+from __future__ import division
 
 from neotime.arithmetic import nano_add, nano_sub, nano_mul, nano_div, nano_mod, symmetric_divmod
 from neotime.clock import MIN_INT64, MAX_INT64

@@ -16,6 +16,8 @@
 # limitations under the License.
 
 
+from __future__ import division
+
 from ctypes import CDLL, Structure, c_longlong, c_long, byref
 
 
