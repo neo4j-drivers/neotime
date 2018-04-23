@@ -118,15 +118,6 @@ class Duration(tuple):
     def __abs__(self):
         return Duration(months=abs(self[0]), days=abs(self[1]), seconds=abs(self[2]), subseconds=abs(self[3]))
 
-    def __radd__(self, other):
-        return self.__add__(other)
-
-    def __rsub__(self, other):
-        return self.__sub__(other)
-
-    def __rmul__(self, other):
-        return self.__mul__(other)
-
     def __repr__(self):
         return "Duration(months=%r, days=%r, seconds=%r, subseconds=%r)" % self
 
