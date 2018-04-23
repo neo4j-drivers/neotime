@@ -16,7 +16,7 @@
 # limitations under the License.
 
 
-from __future__ import division
+from __future__ import division, print_function
 
 from ctypes import CDLL, Structure, c_longlong, c_long, byref
 
@@ -25,50 +25,107 @@ MIN_INT64 = -(2 ** 63)
 MAX_INT64 = (2 ** 63) - 1
 
 
-def _instant_safe():
-    from time import time
-    seconds, nanoseconds = divmod(time() * 1000000000, 1000000000)
-    return Instant(seconds, nanoseconds)
+class Clock(object):
+
+    @staticmethod
+    def list():
+        return sorted((clock for clock in Clock.__subclasses__() if clock.available()),
+                      key=lambda clock: clock.precision(), reverse=True)
+
+    @staticmethod
+    def best():
+        clocks = Clock.list()
+        if clocks:
+            return clocks[0]
+        else:
+            return None
+
+    @classmethod
+    def precision(cls):
+        raise NotImplementedError()
+
+    @classmethod
+    def available(cls):
+        return False
+
+    @classmethod
+    def read_utc(cls):
+        raise NotImplementedError()
 
 
-try:
+class SafeClock(Clock):
 
-    from time import time_ns as _time_ns
+    @classmethod
+    def precision(cls):
+        return 6
 
-except ImportError:
+    @classmethod
+    def available(cls):
+        return True
 
-    try:
-        _libc = CDLL("libc.so.6")
-    except OSError:
-        _instant = _instant_safe
-    else:
-        def _instant_function():
+    @classmethod
+    def read_utc(cls):
+        from time import time
+        seconds, nanoseconds = divmod(time() * 1000000000, 1000000000)
+        return Instant(seconds, nanoseconds)
 
-            time_t = c_longlong
 
-            class CTimeSpec(Structure):
-                _fields_ = [
-                    ("seconds", time_t),
-                    ("nanoseconds", c_long),
-                ]
+class LibCClock(Clock):
 
-            def f():
-                ts = CTimeSpec()
-                if _libc.clock_gettime(0, byref(ts)) == 0:
-                    return Instant(ts.seconds, ts.nanoseconds)
-                else:
-                    return _instant_safe()
+    class CTimeSpec(Structure):
+        _fields_ = [
+            ("seconds", c_longlong),
+            ("nanoseconds", c_long),
+        ]
 
-            return f
+    @classmethod
+    def precision(cls):
+        return 9
 
-        _instant = _instant_function()
+    @classmethod
+    def available(cls):
+        try:
+            _ = CDLL("libc.so.6")
+        except OSError:
+            return False
+        else:
+            return True
 
-else:
+    @classmethod
+    def read_utc(cls):
+        libc = CDLL("libc.so.6")
+        ts = cls.CTimeSpec()
+        status = libc.clock_gettime(0, byref(ts))
+        if status == 0:
+            return Instant(ts.seconds, ts.nanoseconds)
+        else:
+            raise RuntimeError("clock_gettime failed with status %d" % status)
 
-    def _instant():
-        t = _time_ns()
+
+class PEP564Clock(Clock):
+
+    @classmethod
+    def precision(cls):
+        return 9
+
+    @classmethod
+    def available(cls):
+        try:
+            from time import time_ns
+        except ImportError:
+            return False
+        else:
+            return True
+
+    @classmethod
+    def read_utc(cls):
+        from time import time_ns
+        t = time_ns()
         seconds, nanoseconds = divmod(t, 1000000000)
         return Instant(seconds, nanoseconds)
+
+
+clock = Clock.best()
 
 
 class Instant(tuple):
@@ -131,12 +188,13 @@ class Instant(tuple):
     def nanoseconds(self):
         return self[1]
 
+    @property
+    def precision(self):
+        return self[2]
+
 Instant.min = Instant(seconds=0, nanoseconds=0)
 Instant.max = Instant(seconds=MAX_INT64, nanoseconds=999999999)
 
 
-class Clock(object):
-
-    @classmethod
-    def read_utc(cls):
-        return _instant()
+if __name__ == "__main__":
+    print(clock.read_utc())
