@@ -49,12 +49,12 @@ This structure allows the modelling of durations such as _3 months minus 2 days_
 
 The primary instance attributes and their permitted ranges are listed below.
 
-Attribute    | Value
---------------------
-`months`     | Between -(2<sup>63</sup>) and (2<sup>63</sup> - 1) inclusive
-`days`       | Between -(2<sup>63</sup>) and (2<sup>63</sup> - 1) inclusive
-`seconds`    | Between -(2<sup>63</sup>) and (2<sup>63</sup> - 1) inclusive
-`subseconds` | Between -0.999,999,999 and +0.999,999,999 inclusive
+ Attribute    | Value
+--------------|--------------------------------------------------------------
+ `months`     | Between -(2<sup>63</sup>) and (2<sup>63</sup> - 1) inclusive
+ `days`       | Between -(2<sup>63</sup>) and (2<sup>63</sup> - 1) inclusive
+ `seconds`    | Between -(2<sup>63</sup>) and (2<sup>63</sup> - 1) inclusive
+ `subseconds` | Between -0.999,999,999 and +0.999,999,999 inclusive
 
 Two additional secondary attributes are available, each returning a 3-tuple of derived values.
 These are `years_months_days` and `hours_minutes_seconds`.

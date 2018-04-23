@@ -1,0 +1,4 @@
+Neotime
+Copyright 2018, Nigel Small & Neo4j
+
+This product includes software ("Software") developed by Neo Technology.
