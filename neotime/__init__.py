@@ -22,7 +22,7 @@ a number of utility functions.
 
 from __future__ import division
 
-from neotime.arithmetic import nano_add, nano_sub, nano_mul, nano_div, nano_mod, symmetric_divmod
+from neotime.arithmetic import nano_add, nano_sub, nano_mul, nano_div, nano_mod, symmetric_divmod, round_half_to_even
 from neotime.clock import MIN_INT64, MAX_INT64
 
 
@@ -94,8 +94,9 @@ class Duration(tuple):
     def __mod__(self, other):
         if not isinstance(other, int):
             return NotImplemented
-        return Duration(months=round(self[0] % other), days=round(self[1] % other),
-                        seconds=round(self[2] % other), subseconds=nano_mod(self[3], other))
+        seconds, subseconds = symmetric_divmod(nano_add(self[2], self[3]) % other, 1)
+        return Duration(months=round_half_to_even(self[0] % other), days=round_half_to_even(self[1] % other),
+                        seconds=seconds, subseconds=subseconds)
 
     def __divmod__(self, other):
         if not isinstance(other, int):
@@ -105,7 +106,7 @@ class Duration(tuple):
     def __truediv__(self, other):
         if not isinstance(other, (int, float)):
             return NotImplemented
-        return Duration(months=round(float(self[0]) / other), days=round(float(self[1]) / other),
+        return Duration(months=round_half_to_even(float(self[0]) / other), days=round_half_to_even(float(self[1]) / other),
                         seconds=float(self[2]) / other, subseconds=nano_div(self[3], other))
 
     __div__ = __truediv__

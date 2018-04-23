@@ -10,7 +10,6 @@ python:
   - "3.6"
   - "3.6-dev"
   - "3.7-dev"
-  - "3.8-dev"
   - "pypy2.7"
   - "pypy3.5"
   - "nightly"
