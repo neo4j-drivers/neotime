@@ -81,7 +81,7 @@ Operation                 Result
 ``d1 / f``                A ``Duration`` representing ``d1`` divided by ``f``, where ``f`` is a ``float``. Month and day attributes are rounded to the nearest integer, using round-half-to-even.
 ``d1 // i``               A ``Duration`` representing the floor after ``d1`` is divided by ``i``, where ``i`` is an ``int``.
 ``d1 % i``                A ``Duration`` representing the remainder after ``d1`` is divided by ``i``, where ``i`` is an ``int``.
-``divmod(d1,i)``          A pair of ``Duration`` objects representing the floor and remainder after ``d1`` is divided by ``i``, where ``i`` is an ``int``.
+``divmod(d1, i)``         A pair of ``Duration`` objects representing the floor and remainder after ``d1`` is divided by ``i``, where ``i`` is an ``int``.
 ``+d1``                   A ``Duration`` identical to ``d1`` .
 ``-d1``                   A ``Duration`` that is the inverse of ``d1``. Equivalent to ``Duration(months=-d1.months, days=-d1.days, seconds=-d1.seconds, subseconds=-d1.subseconds)``.
 ``abs(d1)``               A ``Duration`` equal to the absolute value of ``d1``. Equivalent to ``Duration(months=abs(d1.months), days=abs(d1.days), seconds=abs(d1.seconds), subseconds=abs(d1.subseconds))``.

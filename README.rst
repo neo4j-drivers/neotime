@@ -7,7 +7,7 @@ Temporal types with nanosecond precision
 
 The ``neotime`` module defines classes for working with temporal data to nanosecond precision.
 These classes comprise a similar set to that provided by the standard library ``datetime`` module.
-Inspiration has also been drawn from ISO-8601.
+Inspiration has also been drawn from `ISO-8601 <https://xkcd.com/1179/>`_.
 
 
 Overview
@@ -15,9 +15,9 @@ Overview
 
 The classes are listed below:
 
-* `Duration <#duration-objects>`_
-* `Date <#date-objects>`_
-* `Time <#time-objects>`_
+* `Duration <http://neotime.readthedocs.io/en/latest/neotime.html#duration-objects>`_
+* `Date <http://neotime.readthedocs.io/en/latest/neotime.html#date-objects>`_
+* `Time <http://neotime.readthedocs.io/en/latest/neotime.html#time-objects>`_
 * TODO
 
 
@@ -49,4 +49,4 @@ Your mileage may vary.
 More Information
 ================
 
-For more information, read the [docs](http://neotime.readthedocs.io/).
+For more information, read the `docs <http://neotime.readthedocs.io/>`_.
