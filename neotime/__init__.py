@@ -27,7 +27,7 @@ from neotime.arithmetic import nano_add, nano_sub, nano_mul, nano_div, nano_mod,
 from neotime.clock import MIN_INT64, MAX_INT64, clock
 
 
-__version__ = "1.0.0a1"
+__version__ = "1.0.0b1"
 
 
 MIN_YEAR = 1

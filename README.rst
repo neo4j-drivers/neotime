@@ -6,6 +6,10 @@ The ``neotime`` module defines classes for working with temporal data to nanosec
 These classes comprise a similar set to that provided by the standard library ``datetime`` module.
 Inspiration has also been drawn from `ISO-8601 <https://xkcd.com/1179/>`_.
 
+.. note::
+
+    Neotime is currently beta quality software.
+
 
 Overview
 ========
@@ -20,11 +24,6 @@ The classes are listed below:
 
 Installation
 ============
-
-.. note::
-
-    Neotime is currently alpha software.
-
 
 To install the latest stable version of neotime, simply use pip:
 
