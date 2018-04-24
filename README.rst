@@ -6,9 +6,7 @@ The ``neotime`` module defines classes for working with temporal data to nanosec
 These classes comprise a similar set to that provided by the standard library ``datetime`` module.
 Inspiration has also been drawn from `ISO-8601 <https://xkcd.com/1179/>`_.
 
-.. note::
-
-    Neotime is currently beta quality software.
+.. note:: Neotime is currently beta quality software.
 
 
 Overview
@@ -16,9 +14,9 @@ Overview
 
 The classes are listed below:
 
-* `Duration <http://neotime.readthedocs.io/en/latest/neotime.html#duration-objects>`_
-* `Date <http://neotime.readthedocs.io/en/latest/neotime.html#date-objects>`_
-* `Time <http://neotime.readthedocs.io/en/latest/neotime.html#time-objects>`_
+* `Duration <http://neotime.readthedocs.io/en/latest/duration.html>`_
+* `Date <http://neotime.readthedocs.io/en/latest/date.html>`_
+* `Time <http://neotime.readthedocs.io/en/latest/time.html>`_
 * TODO
 
 
