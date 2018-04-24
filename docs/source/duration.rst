@@ -1,36 +1,6 @@
-.. module:: neotime
-
-=======================================================
-``neotime`` -- Temporal types with nanosecond precision
-=======================================================
-
-The ``neotime`` module defines classes for working with temporal data.
-These classes comprise a similar set to that provided by the standard library ``datetime`` module.
-Inspiration has also been drawn from ISO-8601.
-
-
-The classes are listed below:
-
-* `Duration <#duration-objects>`_
-* `Date <#date-objects>`_
-* `Time <#time-objects>`_
-* TODO
-
-In addition to these classes, the module also exports several constants:
-
-.. attribute:: neotime.MIN_YEAR
-
-    The smallest year number available.
-    ``MIN_YEAR`` equals `1`.
-
-.. attribute:: neotime.MAX_YEAR
-
-    The largest year number available.
-    ``MAX_YEAR`` equals `9999`.
-
-
-:class:`.Duration` objects
-==========================
+====================
+``neotime.Duration``
+====================
 
 A ``Duration`` represents the difference between two points in time.
 Duration objects store a composite value of `months`, `days` and `seconds`.
@@ -48,6 +18,10 @@ and are applied separately in calculations.
 .. attribute:: Duration.max
 
     The highest duration value possible.
+
+
+Instance methods and attributes
+===============================
 
 A ``Duration`` stores four primary instance attributes internally: ``months``, ``days``, ``seconds`` and ``subseconds``.
 These are maintained as individual values and are immutable.
@@ -68,7 +42,11 @@ Attribute       Value
 ``subseconds``  Between -0.999,999,999 and +0.999,999,999 inclusive
 ==============  ========================================================
 
-`Duration` objects support a number of operations. These are listed below.
+
+Operations
+==========
+
+:class:``.Duration`` objects support a number of operations. These are listed below.
 
 ========================  ====================================================================================================================================================================================
 Operation                 Result
@@ -90,13 +68,3 @@ Operation                 Result
 ``bool(d1)``              :const:`True` if any attribute is non-zero, :const:`False` otherwise.
 ``tuple(d1)``             A 4-tuple of ``(months: int, days: int, seconds: int, subseconds: float)``.
 ========================  ====================================================================================================================================================================================
-
-
-:class:`.Date` objects
-======================
-`TODO`
-
-
-:class:`.Time` objects
-======================
-`TODO`

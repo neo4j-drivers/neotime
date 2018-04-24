@@ -23,7 +23,7 @@ a number of utility functions.
 from __future__ import division
 
 from neotime.arithmetic import nano_add, nano_sub, nano_mul, nano_div, nano_mod, symmetric_divmod, round_half_to_even
-from neotime.clock import MIN_INT64, MAX_INT64
+from neotime.clock import MIN_INT64, MAX_INT64, clock
 
 
 __version__ = "1.0.0a1"
@@ -205,6 +205,8 @@ class Date(object):
     min = None
     max = None
 
+    __zero = None
+
     __ordinal = 0
     __year = 0
     __month = 0
@@ -323,6 +325,8 @@ class Date(object):
         method for the reverse date-to-ordinal transformation is
         :meth:`.to_ordinal`.
         """
+        if ordinal == 0:
+            return cls.__get_zero()
         day = int(ordinal)
         if day < 1 or day > 3652059:
             # Note: this requires a maximum of 22 bits for storage
@@ -353,6 +357,12 @@ class Date(object):
         return instance
 
     @classmethod
+    def __get_zero(cls):
+        if cls.__zero is None:
+            cls.__zero = object.__new__(cls)
+        return cls.__zero
+
+    @classmethod
     def __calc_ordinal(cls, year, month, day):
         if day >= 1:
             ordinal = int(day)
@@ -366,7 +376,7 @@ class Date(object):
 
     def __new__(cls, year, month, day):
         if year == month == day == 0:
-            return object.__new__(cls)
+            return cls.__get_zero()
         year, month, day = cls.__normalize_day(year, month, day)
         ordinal = cls.__calc_ordinal(year, month, day)
         return cls.__new(ordinal, year, month, day)
@@ -523,6 +533,11 @@ class Date(object):
 
     def to_struct_time(self):
         raise NotImplementedError()
+
+    @classmethod
+    def today_utc(cls):
+        t = clock.read_utc()
+        return Date.from_ordinal(t.seconds // 86400 + 719163)
 
 
 Date.min = Date.from_ordinal(1)
