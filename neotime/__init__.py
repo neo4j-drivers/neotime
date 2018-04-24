@@ -212,7 +212,7 @@ class Date(object):
     __month = 0
     __day = 0
 
-    __never = None
+    __zero = None
 
     @classmethod
     def __normalize_year(cls, year):
@@ -310,7 +310,7 @@ class Date(object):
         :meth:`.to_ordinal`.
         """
         if ordinal == 0:
-            return cls.__get_never()
+            return cls.__get_zero()
         day = int(ordinal)
         if day < 1 or day > 3652059:
             # Note: this requires a maximum of 22 bits for storage
@@ -341,10 +341,10 @@ class Date(object):
         return instance
 
     @classmethod
-    def __get_never(cls):
-        if cls.__never is None:
-            cls.__never = object.__new__(cls)
-        return cls.__never
+    def __get_zero(cls):
+        if cls.__zero is None:
+            cls.__zero = object.__new__(cls)
+        return cls.__zero
 
     @classmethod
     def __calc_ordinal(cls, year, month, day):
@@ -360,7 +360,7 @@ class Date(object):
 
     def __new__(cls, year, month, day):
         if year == month == day == 0:
-            return cls.__get_never()
+            return cls.__get_zero()
         year, month, day = cls.__normalize_day(year, month, day)
         ordinal = cls.__calc_ordinal(year, month, day)
         return cls.__new(ordinal, year, month, day)
@@ -446,7 +446,7 @@ class Date(object):
 
     def __repr__(self):
         if self.__ordinal == 0:
-            return "Never"
+            return "ZeroDate"
         return "Date(%r, %r, %r)" % self.year_month_day
 
     def __str__(self):
@@ -525,7 +525,7 @@ Date.min = Date.from_ordinal(1)
 Date.max = Date.from_ordinal(3652059)
 Date.resolution = Duration(days=1)
 
-Never = Date(0, 0, 0)
+ZeroDate = Date(0, 0, 0)
 
 
 class Time(object):
@@ -542,11 +542,6 @@ class Time(object):
     __second = 0
 
     __midnight = None
-
-    @classmethod
-    def check_ticks(cls, ticks):
-        if ticks < 0 or ticks >= 86400:
-            raise ValueError("Ticks out of range (0..86400)")
 
     @classmethod
     def __normalize_hour(cls, hour):
@@ -637,3 +632,111 @@ class Time(object):
 
 
 Midnight = Time(0, 0, 0)
+
+
+class DateTime(object):
+
+    min = None
+    max = None
+    resolution = None
+
+    __date = ZeroDate
+    __time = Midnight
+
+    __never = None
+
+    @classmethod
+    def from_ordinal_ticks(cls, ordinal, ticks):
+        return cls.__new(Date.from_ordinal(ordinal), Time.from_ticks(ticks))
+
+    @classmethod
+    def __new(cls, date, time):
+        assert isinstance(date, Date)
+        assert isinstance(time, Time)
+        instance = object.__new__(cls)
+        instance.__date = date
+        instance.__time = time
+        return instance
+
+    @classmethod
+    def __get_never(cls):
+        if cls.__never is None:
+            cls.__never = object.__new__(cls)
+        return cls.__never
+
+    def __new__(cls, year, month, day, hour, minute, second):
+        if year == month == day == hour == minute == second == 0:
+            return cls.__get_never()
+        return cls.__new(Date(year, month, day), Time(hour, minute, second))
+
+    def __repr__(self):
+        if self.__date == ZeroDate:
+            return "Never"
+        return "DateTime(%r, %r, %r, %r, %r, %r)" % (self.year_month_day + self.hour_minute_second)
+
+    @property
+    def date(self):
+        return self.__date
+
+    @property
+    def year(self):
+        return self.__date.year
+
+    @property
+    def month(self):
+        return self.__date.month
+
+    @property
+    def day(self):
+        return self.__date.day
+
+    @property
+    def year_month_day(self):
+        return self.__date.year_month_day
+
+    @property
+    def year_week_day(self):
+        return self.__date.year_week_day
+
+    @property
+    def year_day(self):
+        return self.__date.year_day
+
+    @property
+    def time(self):
+        return self.__time
+
+    @property
+    def hour(self):
+        return self.__time.hour
+
+    @property
+    def minute(self):
+        return self.__time.minute
+
+    @property
+    def second(self):
+        return self.__time.second
+
+    @property
+    def hour_minute_second(self):
+        return self.__time.hour_minute_second
+
+    def replace(self, year=0, month=0, day=0, hour=0, minute=0, second=0):
+        if year == month == day == hour == minute == second == 0:
+            return self
+        date = self.__date.replace(year, month, day)
+        time = self.__time.replace(hour, minute, second)
+        return self.__new(date, time)
+
+    @classmethod
+    def now_utc(cls):
+        t = clock.read_utc()
+        ds, ts = divmod(t.seconds, 86400)
+        date = Date.from_ordinal(ds + 719163)
+        nanoseconds = int(1000000000 * ts + t.nanoseconds)
+        time = Time.from_ticks(nanoseconds / 1000000000)
+        return cls.__new(date, time)
+
+
+Never = DateTime(0, 0, 0, 0, 0, 0)

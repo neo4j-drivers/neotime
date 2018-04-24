@@ -15,6 +15,7 @@ Inspiration has also been drawn from `ISO-8601 <https://xkcd.com/1179/>`_.
     duration
     date
     time
+    datetime
 
 In addition to these classes, the module exports several constants:
 

@@ -6,7 +6,7 @@
 
 .. py:classmethod:: Time.now_utc()
 
-.. py:classmethod:: Date.from_ticks(ticks)
+.. py:classmethod:: Time.from_ticks(ticks)
 
 
 Instance methods and attributes

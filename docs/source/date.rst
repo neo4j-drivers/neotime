@@ -27,7 +27,7 @@ Externally, the day number is always the same as would be written on a calendar.
     ``day``    1                         :attr:`Date.days_in_month(year, month) <Date.days_in_month>`
     =========  ========================  ===================================
 
-    A zero date can also be acquired by passing all zeroes to the :class:`.Date` constructor or by using the :attr:`.Never` constant.
+    A zero date can also be acquired by passing all zeroes to the :class:`.Date` constructor or by using the :attr:`.ZeroDate` constant.
 
 .. py:classmethod:: Date.today_utc()
 
@@ -82,10 +82,10 @@ Operations
 TODO
 
 
-The :attr:`.Never` object
-=========================
+The :attr:`.ZeroDate` object
+============================
 
-.. attribute:: Never
+.. attribute:: ZeroDate
 
     A :class:`.Date` instance set to `0000-00-00`.
     This has an :attr:`ordinal <.date.ordinal>` value of `0`.
