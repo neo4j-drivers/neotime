@@ -3,7 +3,7 @@
 ================
 
 A :class:`.Date` object represents a date in the `proleptic Gregorian Calendar <https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar>`_.
-Years between `0001` and `9999` are supported, with additional support for the `zero date` used in some contexts.
+Years between `0001` and `9999` are supported, with additional support for the "zero date" used in some contexts.
 
 Each date is based on a proleptic Gregorian ordinal, which models 1 Jan 0001 as `day 1` and counts each subsequent day up to, and including, 31 Dec 9999.
 The standard `year`, `month` and `day` value of each date is also available.
@@ -27,7 +27,7 @@ Externally, the day number is always the same as would be written on a calendar.
     ``day``    1                         :attr:`Date.days_in_month(year, month) <Date.days_in_month>`
     =========  ========================  ===================================
 
-    A zero date can also be acquired by passing all zeroes to the :class:`.Date` constructor or by using :attr:`.ZeroDate` directly.
+    A zero date can also be acquired by passing all zeroes to the :class:`.Date` constructor or by using the :attr:`.Never` constant.
 
 .. py:classmethod:: Date.today_utc()
 
@@ -82,10 +82,10 @@ Operations
 TODO
 
 
-The :attr:`.ZeroDate` object
-============================
+The :attr:`.Never` object
+=========================
 
-.. attribute:: ZeroDate
+.. attribute:: Never
 
     A :class:`.Date` instance set to `0000-00-00`.
     This has an :attr:`ordinal <.date.ordinal>` value of `0`.

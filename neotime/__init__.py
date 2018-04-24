@@ -22,7 +22,8 @@ a number of utility functions.
 
 from __future__ import division
 
-from neotime.arithmetic import nano_add, nano_sub, nano_mul, nano_div, nano_mod, symmetric_divmod, round_half_to_even
+from neotime.arithmetic import nano_add, nano_sub, nano_mul, nano_div, nano_mod, symmetric_divmod, round_half_to_even, \
+    nano_divmod
 from neotime.clock import MIN_INT64, MAX_INT64, clock
 
 
@@ -204,31 +205,14 @@ class Date(object):
 
     min = None
     max = None
-
-    __zero = None
+    resolution = None
 
     __ordinal = 0
     __year = 0
     __month = 0
-    # Holds a value between 1 and 28 or between -1 and -3. Positive values
-    # represent days from the 1st to the 28th of the month inclusive and
-    # negative values from the last (-1) to the 2nd from last (-3).
-    #
-    # Therefore, for a 31-day month, days 1..28 are generally stored as-is,
-    # whereas days 29, 30 and 31 are stored as -3, -2 and -1 respectively.
-    # days 28 back to 4. This encoding improves some temporal arithmetic,
-    # specifically adding and subtracting months; Adding one month to 31 Oct
-    # (month=10, day=-1) gives 30 Nov (month=11, day=-1), adding another
-    # month "remembers" the original day, giving 31 Dec (month=12, day=-1).
-    #
-    #    1   2   3   4   5   6   7             25  26  27  28  29  30  31
-    #    |---|---|---|---|---|---| - - - - - - |---|---|---|---|---|---|
-    #    1   2   3   4   5   6   7             25  26  27  28 -3  -2  -1
-    #
     __day = 0
 
-    #: The smallest possible difference between non-equal :class:`.Date` objects, ``Duration(days=1)``.
-    resolution = None
+    __never = None
 
     @classmethod
     def __normalize_year(cls, year):
@@ -326,7 +310,7 @@ class Date(object):
         :meth:`.to_ordinal`.
         """
         if ordinal == 0:
-            return cls.__get_zero()
+            return cls.__get_never()
         day = int(ordinal)
         if day < 1 or day > 3652059:
             # Note: this requires a maximum of 22 bits for storage
@@ -350,17 +334,17 @@ class Date(object):
     @classmethod
     def __new(cls, ordinal, year, month, day):
         instance = object.__new__(cls)
-        instance.__ordinal = ordinal
-        instance.__year = year
-        instance.__month = month
-        instance.__day = day
+        instance.__ordinal = int(ordinal)
+        instance.__year = int(year)
+        instance.__month = int(month)
+        instance.__day = int(day)
         return instance
 
     @classmethod
-    def __get_zero(cls):
-        if cls.__zero is None:
-            cls.__zero = object.__new__(cls)
-        return cls.__zero
+    def __get_never(cls):
+        if cls.__never is None:
+            cls.__never = object.__new__(cls)
+        return cls.__never
 
     @classmethod
     def __calc_ordinal(cls, year, month, day):
@@ -376,7 +360,7 @@ class Date(object):
 
     def __new__(cls, year, month, day):
         if year == month == day == 0:
-            return cls.__get_zero()
+            return cls.__get_never()
         year, month, day = cls.__normalize_day(year, month, day)
         ordinal = cls.__calc_ordinal(year, month, day)
         return cls.__new(ordinal, year, month, day)
@@ -531,9 +515,6 @@ class Date(object):
         """
         return Date(year or self.__year, month or self.__month, day or self.__day)
 
-    def to_struct_time(self):
-        raise NotImplementedError()
-
     @classmethod
     def today_utc(cls):
         t = clock.read_utc()
@@ -544,13 +525,23 @@ Date.min = Date.from_ordinal(1)
 Date.max = Date.from_ordinal(3652059)
 Date.resolution = Duration(days=1)
 
-ZeroDate = Date(0, 0, 0)
+Never = Date(0, 0, 0)
 
 
-class Time(float):
-    """ Holds any value between 0 and 86399.999999999 that represents number of seconds since midnight.
-    Floats (double precision) are guaranteed to store 15 significant digits without loss, which is all we need.
+class Time(object):
+    """ Time of day.
     """
+
+    min = None
+    max = None
+    resolution = None
+
+    __ticks = 0
+    __hour = 0
+    __minute = 0
+    __second = 0
+
+    __midnight = None
 
     @classmethod
     def check_ticks(cls, ticks):
@@ -558,45 +549,91 @@ class Time(float):
             raise ValueError("Ticks out of range (0..86400)")
 
     @classmethod
-    def check_hour(cls, hour):
-        if hour < 0 or hour > 23:
-            raise ValueError("Hour out of range (0..23)")
+    def __normalize_hour(cls, hour):
+        if 0 <= hour < 24:
+            return int(hour)
+        raise ValueError("Hour out of range (0..23)")
 
     @classmethod
-    def check_minute(cls, hour, minute):
-        cls.check_hour(hour)
-        if minute < 0 or minute > 59:
-            raise ValueError("Minute out of range (0..59)")
+    def __normalize_minute(cls, hour, minute):
+        hour = cls.__normalize_hour(hour)
+        if 0 <= minute < 60:
+            return hour, int(minute)
+        raise ValueError("Minute out of range (0..59)")
 
     @classmethod
-    def check_second(cls, hour, minute, second):
-        cls.check_minute(hour, minute)
-        if second < 0 or second > 59:
-            raise ValueError("Second out of range (0..59)")
-
-    @classmethod
-    def ticks(cls, hour, minute, second):
-        cls.check_second(hour, minute, second)
-        return 3600 * hour + 60 * minute + second
-
-    @classmethod
-    def hour_minute_second(cls, ticks):
-        pass  # TODO
-
-    @classmethod
-    def from_unix_time(cls, seconds=None, nanoseconds=None):   # TODO: zone
-        from time import gmtime  # TODO rewrite
-        utc = gmtime(seconds)
-        print((utc.tm_hour, utc.tm_min, utc.tm_sec, nanoseconds))
-        return cls(utc.tm_hour, utc.tm_min, utc.tm_sec + float(nanoseconds) / 1000000000)
+    def __normalize_second(cls, hour, minute, second):
+        hour, minute = cls.__normalize_minute(hour, minute)
+        if 0 <= second < 60:
+            return hour, minute, float(second)
+        raise ValueError("Second out of range (0..<60)")
 
     @classmethod
     def from_ticks(cls, ticks):
-        cls.check_ticks(ticks)
-        return super(Time, cls).__new__(cls, ticks)
+        if ticks == 0:
+            return cls.__get_midnight()
+        if 0 <= ticks < 86400:
+            minute, second = nano_divmod(ticks, 60)
+            hour, minute = divmod(minute, 60)
+            return cls.__new(ticks, hour, minute, second)
+        raise ValueError("Ticks out of range (0..86400)")
+
+    @classmethod
+    def __new(cls, ticks, hour, minute, second):
+        instance = object.__new__(cls)
+        instance.__ticks = float(ticks)
+        instance.__hour = int(hour)
+        instance.__minute = int(minute)
+        instance.__second = float(second)
+        return instance
+
+    @classmethod
+    def __get_midnight(cls):
+        if cls.__midnight is None:
+            cls.__midnight = object.__new__(cls)
+        return cls.__midnight
+
+    def __new__(cls, hour, minute, second):
+        if hour == minute == second == 0:
+            return cls.__get_midnight()
+        hour, minute, second = cls.__normalize_second(hour, minute, second)
+        ticks = 3600 * hour + 60 * minute + second
+        return cls.__new(ticks, hour, minute, second)
 
     def __repr__(self):
-        return "Time(%r, %r, %r)" % self.hours_minutes_seconds
+        return "Time(%r, %r, %r)" % self.hour_minute_second
+
+    @property
+    def ticks(self):
+        return self.__ticks
+
+    @property
+    def hour(self):
+        return self.__hour
+
+    @property
+    def minute(self):
+        return self.__minute
+
+    @property
+    def second(self):
+        return self.__second
+
+    @property
+    def hour_minute_second(self):
+        return self.__hour, self.__minute, self.__second
+
+    def replace(self, hour=0, minute=0, second=0.0):
+        """ Return a :class:`.Time` with one or more components replaced
+        with new values.
+        """
+        return Time(hour or self.__hour, minute or self.__minute, second or self.__second)
+
+    @classmethod
+    def now_utc(cls):
+        t = clock.read_utc()
+        nanoseconds = int(1000000000 * (t.seconds % 86400) + t.nanoseconds)
+        return Time.from_ticks(nanoseconds / 1000000000)
 
 
-Midnight = float.__new__(Time, 0)
+Midnight = Time(0, 0, 0)

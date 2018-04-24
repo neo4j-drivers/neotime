@@ -16,7 +16,7 @@ Inspiration has also been drawn from `ISO-8601 <https://xkcd.com/1179/>`_.
     date
     time
 
-In addition to these classes, the module also exports several constants:
+In addition to these classes, the module exports several constants:
 
 .. attribute:: neotime.MIN_YEAR
 

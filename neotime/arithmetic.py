@@ -120,6 +120,25 @@ def nano_mod(x, y):
     return number(r / 1000000000)
 
 
+def nano_divmod(x, y):
+    """
+
+        >>> divmod(0.7, 0.2)
+        (3.0, 0.09999999999999992)
+        >>> nano_divmod(0.7, 0.2)
+        (3, 0.1)
+
+    :param x:
+    :param y:
+    :return:
+    """
+    number = type(x)
+    nx = int(1000000000 * x)
+    ny = int(1000000000 * y)
+    q, r = divmod(nx, ny)
+    return int(q), number(r / 1000000000)
+
+
 def signum(n):
     try:
         if isnan(n):
