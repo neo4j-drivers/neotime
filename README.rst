@@ -1,9 +1,6 @@
 =======
 Neotime
 =======
-----------------------------------------
-Temporal types with nanosecond precision
-----------------------------------------
 
 The ``neotime`` module defines classes for working with temporal data to nanosecond precision.
 These classes comprise a similar set to that provided by the standard library ``datetime`` module.
