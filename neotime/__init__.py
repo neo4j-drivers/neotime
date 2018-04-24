@@ -208,14 +208,12 @@ class Date(object):
     __ordinal = 0
     __year = 0
     __month = 0
-    # Holds a value between 1 and 28 or between -1 and -28. Positive values
+    # Holds a value between 1 and 28 or between -1 and -3. Positive values
     # represent days from the 1st to the 28th of the month inclusive and
-    # negative values from the last to the 28th from last. This is with the
-    # exception of 28-day months, where the last day is always -1.
+    # negative values from the last (-1) to the 2nd from last (-3).
     #
     # Therefore, for a 31-day month, days 1..28 are generally stored as-is,
     # whereas days 29, 30 and 31 are stored as -3, -2 and -1 respectively.
-    # Day values of -4 to -28 are also valid and would also represent real
     # days 28 back to 4. This encoding improves some temporal arithmetic,
     # specifically adding and subtracting months; Adding one month to 31 Oct
     # (month=10, day=-1) gives 30 Nov (month=11, day=-1), adding another
@@ -223,8 +221,7 @@ class Date(object):
     #
     #    1   2   3   4   5   6   7             25  26  27  28  29  30  31
     #    |---|---|---|---|---|---| - - - - - - |---|---|---|---|---|---|
-    #    1   2   3   4   5   6   7             25  26  27  28
-    #               -28 -27 -26 -25           -7  -6  -5  -4  -3  -2  -1
+    #    1   2   3   4   5   6   7             25  26  27  28 -3  -2  -1
     #
     __day = 0
 
@@ -249,26 +246,24 @@ class Date(object):
         """ Coerce the day of the month to an internal value that may or
         may not match the "public" value.
 
-        All days from the 1st to the 27th of the month are stored as-is,
-        i.e. 1..27. The last day of the month (28th, 29th, 20th or 31st)
-        is always -1, regardless of the length of the month. The remaining
-        days are mapped to a value that depends on the number of days in
-        that month.
+        With the exception of the last three days of every month, all
+        days are stored as-is. The last three days are instead stored
+        as -1 (the last), -2 (first from last) and -3 (second from last).
 
-        For a 28-day month, the last week is as follows:
+        Therefore, for a 28-day month, the last week is as follows:
 
             Day   | 22 23 24 25 26 27 28
-            Value | 22 23 24 25 26 27 -1
+            Value | 22 23 24 25 -3 -2 -1
 
         For a 29-day month, the last week is as follows:
 
             Day   | 23 24 25 26 27 28 29
-            Value | 23 24 25 26 27 28 -1
+            Value | 23 24 25 26 -3 -2 -1
 
         For a 30-day month, the last week is as follows:
 
             Day   | 24 25 26 27 28 29 30
-            Value | 24 25 26 27 28 -2 -1
+            Value | 24 25 26 27 -3 -2 -1
 
         For a 31-day month, the last week is as follows:
 
@@ -284,23 +279,17 @@ class Date(object):
         :return:
         """
         year, month = cls.__normalize_month(year, month)
-        if 1 <= day <= 27 or day == -1:
-            return year, month, int(day)
         days_in_month = cls.days_in_month(year, month)
-        if day == days_in_month:
+        if day in (days_in_month, -1):
             return year, month, -1
-        if day == 28:
-            return year, month, 28
-        if days_in_month == 30:
-            if day in (29, -2):
-                return year, month, -2
-        if days_in_month == 31:
-            if day in (30, -2):
-                return year, month, -2
-            if day in (29, -3):
-                return year, month, -3
+        if day in (days_in_month - 1, -2):
+            return year, month, -2
+        if day in (days_in_month - 2, -3):
+            return year, month, -3
+        if 1 <= day <= days_in_month - 3:
+            return year, month, int(day)
         # TODO improve this error message
-        raise ValueError("Day %d out of range (-28..-1, 1..%d)" % (day, days_in_month))
+        raise ValueError("Day %d out of range (1..%d, -1, -2 ,-3)" % (day, days_in_month))
 
     @classmethod
     def is_leap_year(cls, year):

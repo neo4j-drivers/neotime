@@ -1,14 +1,14 @@
-.. Neotime documentation master file, created by
-   sphinx-quickstart on Tue Apr 24 00:42:26 2018.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+*******
+Neotime
+*******
 
-Welcome to Neotime's documentation!
-===================================
+Neotime is an advanced ISO-8601 compatible date/time library that supports nanosecond precision.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Modules:
+
+   neotime
 
 
 
