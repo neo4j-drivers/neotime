@@ -18,36 +18,37 @@
 
 from unittest import TestCase
 
-from neotime.clock import Instant
+from neotime.clock import T
 
 
 class TimeSpecTestCase(TestCase):
 
     def test_zero_timebase(self):
-        tb = Instant()
+        tb = T()
         self.assertEqual(tb.seconds, 0)
         self.assertEqual(tb.nanoseconds, 0)
 
     def test_only_seconds(self):
-        tb = Instant(seconds=123456)
+        tb = T(123456)
         self.assertEqual(tb.seconds, 123456)
         self.assertEqual(tb.nanoseconds, 0)
 
     def test_only_nanoseconds(self):
-        tb = Instant(nanoseconds=123456789)
+        tb = T((0, 123456789))
         self.assertEqual(tb.seconds, 0)
         self.assertEqual(tb.nanoseconds, 123456789)
 
     def test_nanoseconds_overflow(self):
-        tb = Instant(nanoseconds=2123456789)
+        tb = T((0, 2123456789))
         self.assertEqual(tb.seconds, 2)
         self.assertEqual(tb.nanoseconds, 123456789)
 
     def test_positive_nanoseconds(self):
-        tb = Instant(1, 1)
+        tb = T((1, 1))
         self.assertEqual(tb.seconds, 1)
         self.assertEqual(tb.nanoseconds, 1)
 
     def test_negative_nanoseconds(self):
-        with self.assertRaises(ValueError):
-            _ = Instant(1, -1)
+        tb = T((1, -1))
+        self.assertEqual(tb.seconds, 0)
+        self.assertEqual(tb.nanoseconds, 999999999)

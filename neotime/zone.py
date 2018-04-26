@@ -66,5 +66,5 @@ class LocalTime(ZonedTime):
 
 
 def now(zone=None):
-    seconds, nanoseconds = Clock.read_utc()
+    seconds, nanoseconds = Clock.read()
     return Time.from_unix_time(seconds, nanoseconds)

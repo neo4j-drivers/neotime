@@ -22,13 +22,19 @@ a number of utility functions.
 
 from __future__ import division
 
-from neotime.arithmetic import nano_add, nano_sub, nano_mul, nano_div, nano_mod, symmetric_divmod, round_half_to_even, \
-    nano_divmod
-from neotime.clock import MIN_INT64, MAX_INT64, clock
+from datetime import timedelta, date, time, datetime
+from functools import total_ordering
+from time import struct_time
+
+from neotime.arithmetic import (nano_add, nano_sub, nano_mul, nano_div, nano_mod, nano_divmod,
+                                symmetric_divmod, round_half_to_even)
 
 
 __version__ = "1.0.0b1"
 
+
+MIN_INT64 = -(2 ** 63)
+MAX_INT64 = (2 ** 63) - 1
 
 MIN_YEAR = 1
 MAX_YEAR = 9999
@@ -201,7 +207,13 @@ Duration.min = Duration(months=MIN_INT64, days=MIN_INT64, seconds=MIN_INT64, sub
 Duration.max = Duration(months=MAX_INT64, days=MAX_INT64, seconds=MAX_INT64, subseconds=+0.999999999)
 
 
+@total_ordering
 class Date(object):
+    """
+
+    0xxxxxxx xxxxxxxx           -- Date(1970-01-01..2059-09-18) -- 719163..
+    10xxxxxx xxxxxxxx xxxxxxxx  -- Date(0001-01-01..9999-12-31) -- 0..
+    """
 
     min = None
     max = None
@@ -213,6 +225,260 @@ class Date(object):
     __day = 0
 
     __zero = None
+
+    @classmethod
+    def today(cls):
+        from neotime.clock import Clock, T
+        t = Clock().read()
+        ds = t.seconds // 86400
+        return Date.from_ordinal(ds + 719163)
+
+    @classmethod
+    def from_timestamp(cls, timestamp):
+        from neotime.clock import Clock, T
+        t = T(timestamp) + Clock().offset()
+        ds = t.seconds // 86400
+        return Date.from_ordinal(ds + 719163)
+
+    fromtimestamp = from_timestamp
+
+    @classmethod
+    def from_ordinal(cls, ordinal):
+        """ Return the :class:`.Date` that corresponds to the proleptic
+        Gregorian ordinal, where ``0001-01-01`` has ordinal 1 and
+        ``9999-12-31`` has ordinal 3,652,059. Values outside of this
+        range trigger a :exc:`ValueError`. The corresponding instance
+        method for the reverse date-to-ordinal transformation is
+        :meth:`.to_ordinal`.
+        """
+        if ordinal == 0:
+            return cls.__get_zero()
+        if ordinal >= 719163:
+            year = 1970
+            month = 1
+            day = int(ordinal - 719162)
+        else:
+            year = 1
+            month = 1
+            day = int(ordinal)
+        if day < 1 or day > 3652059:
+            # Note: this requires a maximum of 22 bits for storage
+            # Could be transferred in 3 bytes.
+            raise ValueError("Ordinal out of range (1..3652059)")
+        days_in_year = cls.days_in_year(year)
+        while day > days_in_year:
+            day -= days_in_year
+            year += 1
+            days_in_year = cls.days_in_year(year)
+        days_in_month = cls.days_in_month(year, month)
+        while day > days_in_month:
+            day -= days_in_month
+            month += 1
+            days_in_month = cls.days_in_month(year, month)
+        year, month, day = cls.__normalize_day(year, month, day)
+        return cls.__new(ordinal, year, month, day)
+
+    fromordinal = from_ordinal
+
+    @classmethod
+    def is_leap_year(cls, year):
+        year = cls.__normalize_year(year)
+        if year % 4 != 0:
+            return False
+        if year % 100 != 0:
+            return True
+        return year % 400 == 0
+
+    @classmethod
+    def days_in_year(cls, year):
+        return 366 if cls.is_leap_year(year) else 365
+
+    @classmethod
+    def days_in_month(cls, year, month):
+        year, month = cls.__normalize_month(year, month)
+        if month in (9, 4, 6, 11):
+            return 30
+        elif month != 2:
+            return 31
+        else:
+            return 29 if cls.is_leap_year(year) else 28
+
+    @classmethod
+    def __new(cls, ordinal, year, month, day):
+        instance = object.__new__(cls)
+        instance.__ordinal = int(ordinal)
+        instance.__year = int(year)
+        instance.__month = int(month)
+        instance.__day = int(day)
+        return instance
+
+    def __new__(cls, year, month, day):
+        if year == month == day == 0:
+            return cls.__get_zero()
+        year, month, day = cls.__normalize_day(year, month, day)
+        ordinal = cls.__calc_ordinal(year, month, day)
+        return cls.__new(ordinal, year, month, day)
+
+    def __hash__(self):
+        return hash(self.toordinal())
+
+    def __eq__(self, other):
+        if isinstance(other, (Date, date)):
+            return self.toordinal() == other.toordinal()
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __lt__(self, other):
+        if isinstance(other, (Date, date)):
+            return self.toordinal() < other.toordinal()
+        return NotImplemented
+
+    def __int__(self):
+        return int(self.toordinal())
+
+    def __add__(self, other):
+        if isinstance(other, Duration):
+            if other.seconds or other.subseconds:
+                raise ValueError("Cannot add a Duration with seconds or subseconds to a Date")
+            if other.months == other.days == 0:
+                return self
+            new_date = self.replace()
+            # Add days before months as the former sometimes
+            # requires the current ordinal to be correct.
+            if other.days:
+                Date.__increment_days(new_date, other.days)
+            if other.months:
+                Date.__increment_months(new_date, other.months)
+            new_date.__ordinal = self.__calc_ordinal(new_date.year, new_date.month, new_date.day)
+            return new_date
+        return NotImplemented
+
+    def __sub__(self, other):
+        if isinstance(other, (Date, date)):
+            return Duration(days=(self.toordinal() - other.toordinal()))
+        try:
+            return self.__add__(-other)
+        except TypeError:
+            return NotImplemented
+
+    def __repr__(self):
+        if self.__ordinal == 0:
+            return "neotime.Date(0, 0, 0)"
+        return "neotime.Date(%r, %r, %r)" % self.year_month_day
+
+    def __str__(self):
+        if self.__ordinal == 0:
+            return "0000-00-00"
+        return "%04d-%02d-%02d" % self.year_month_day
+
+    @property
+    def ordinal(self):
+        """ Return the current value as an ordinal.
+        """
+        return self.__ordinal
+
+    def to_ordinal(self):
+        """ Return the current value as an ordinal.
+        """
+        return self.__ordinal
+
+    toordinal = to_ordinal
+
+    @property
+    def year(self):
+        return self.__year
+
+    @property
+    def month(self):
+        return self.__month
+
+    @property
+    def day(self):
+        if self.__day == 0:
+            return 0
+        if self.__day >= 1:
+            return self.__day
+        return self.days_in_month(self.__year, self.__month) + self.__day + 1
+
+    @property
+    def year_month_day(self):
+        return self.year, self.month, self.day
+
+    @property
+    def year_week_day(self):
+        ordinal = self.__ordinal
+        year = self.__year
+
+        def day_of_week(o):
+            return ((o - 1) % 7) + 1
+
+        def iso_week_1(y):
+            j4 = Date(y, 1, 4)
+            return j4 + Duration(days=(1 - day_of_week(j4.toordinal())))
+
+        if ordinal >= Date(year, 12, 29).toordinal():
+            week1 = iso_week_1(year + 1)
+            if ordinal < week1.toordinal():
+                week1 = iso_week_1(year)
+            else:
+                year += 1
+        else:
+            week1 = iso_week_1(year)
+            if ordinal < week1.toordinal():
+                year -= 1
+                week1 = iso_week_1(year)
+        return year, ((ordinal - week1.toordinal()) / 7 + 1), day_of_week(ordinal)
+
+    @property
+    def year_day(self):
+        return self.__year, self.toordinal() - Date(self.__year, 1, 1).toordinal() + 1
+
+    def replace(self, year=None, month=None, day=None):
+        """ Return a :class:`.Date` with one or more components replaced
+        with new values.
+        """
+        return Date(year or self.__year, month or self.__month, day or self.__day)
+
+    @classmethod
+    def today_utc(cls):
+        from neotime.clock import Clock
+        t = Clock().read()
+        return Date.from_ordinal(t.seconds // 86400 + 719163)
+
+    def timetuple(self):
+        _, _, day_of_week = self.year_week_day
+        _, day_of_year = self.year_day
+        return struct_time(
+            tm_year=self.year,
+            tm_mon=self.month,
+            tm_mday=self.day,
+            tm_hour=0,
+            tm_min=0,
+            tm_sec=0,
+            tm_wday=day_of_week - 1,
+            tm_yday=day_of_year,
+            tm_isdst=-1,
+        )
+
+    @classmethod
+    def __get_zero(cls):
+        if cls.__zero is None:
+            cls.__zero = object.__new__(cls)
+        return cls.__zero
+
+    @classmethod
+    def __calc_ordinal(cls, year, month, day):
+        if day >= 1:
+            ordinal = int(day)
+        else:
+            ordinal = cls.days_in_month(year, month) + int(day) + 1
+        for m in range(1, month):
+            ordinal += cls.days_in_month(year, m)
+        for y in range(1, year):
+            ordinal += cls.days_in_year(y)
+        return ordinal
 
     @classmethod
     def __normalize_year(cls, year):
@@ -277,108 +543,6 @@ class Date(object):
         # TODO improve this error message
         raise ValueError("Day %d out of range (1..%d, -1, -2 ,-3)" % (day, days_in_month))
 
-    @classmethod
-    def is_leap_year(cls, year):
-        year = cls.__normalize_year(year)
-        if year % 4 != 0:
-            return False
-        if year % 100 != 0:
-            return True
-        return year % 400 == 0
-
-    @classmethod
-    def days_in_year(cls, year):
-        return 366 if cls.is_leap_year(year) else 365
-
-    @classmethod
-    def days_in_month(cls, year, month):
-        year, month = cls.__normalize_month(year, month)
-        if month in (9, 4, 6, 11):
-            return 30
-        elif month != 2:
-            return 31
-        else:
-            return 29 if cls.is_leap_year(year) else 28
-
-    @classmethod
-    def from_ordinal(cls, ordinal):
-        """ Return the :class:`.Date` that corresponds to the proleptic
-        Gregorian ordinal, where ``0001-01-01`` has ordinal 1 and
-        ``9999-12-31`` has ordinal 3,652,059. Values outside of this
-        range trigger a :exc:`ValueError`. The corresponding instance
-        method for the reverse date-to-ordinal transformation is
-        :meth:`.to_ordinal`.
-        """
-        if ordinal == 0:
-            return cls.__get_zero()
-        day = int(ordinal)
-        if day < 1 or day > 3652059:
-            # Note: this requires a maximum of 22 bits for storage
-            # Could be transferred in 3 bytes.
-            raise ValueError("Ordinal out of range (1..3652059)")
-        year = 1
-        month = 1
-        days_in_year = cls.days_in_year(year)
-        while day > days_in_year:
-            day -= days_in_year
-            year += 1
-            days_in_year = cls.days_in_year(year)
-        days_in_month = cls.days_in_month(year, month)
-        while day > days_in_month:
-            day -= days_in_month
-            month += 1
-            days_in_month = cls.days_in_month(year, month)
-        year, month, day = cls.__normalize_day(year, month, day)
-        return cls.__new(ordinal, year, month, day)
-
-    @classmethod
-    def __new(cls, ordinal, year, month, day):
-        instance = object.__new__(cls)
-        instance.__ordinal = int(ordinal)
-        instance.__year = int(year)
-        instance.__month = int(month)
-        instance.__day = int(day)
-        return instance
-
-    @classmethod
-    def __get_zero(cls):
-        if cls.__zero is None:
-            cls.__zero = object.__new__(cls)
-        return cls.__zero
-
-    @classmethod
-    def __calc_ordinal(cls, year, month, day):
-        if day >= 1:
-            ordinal = int(day)
-        else:
-            ordinal = cls.days_in_month(year, month) + int(day) + 1
-        for m in range(1, month):
-            ordinal += cls.days_in_month(year, m)
-        for y in range(1, year):
-            ordinal += cls.days_in_year(y)
-        return ordinal
-
-    def __new__(cls, year, month, day):
-        if year == month == day == 0:
-            return cls.__get_zero()
-        year, month, day = cls.__normalize_day(year, month, day)
-        ordinal = cls.__calc_ordinal(year, month, day)
-        return cls.__new(ordinal, year, month, day)
-
-    def __eq__(self, other):
-        if isinstance(other, Date):
-            return self.ordinal == other.ordinal
-        return False
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    def __hash__(self):
-        return hash(self.ordinal)
-
-    def __int__(self):
-        return int(self.ordinal)
-
     def __increment_months(self, months):
         years, months = symmetric_divmod(months, 12)
         year = self.__year + years
@@ -402,132 +566,16 @@ class Date(object):
         new_date = Date.from_ordinal(self.__ordinal + days)
         self.__year, self.__month, self.__day = new_date.__year, new_date.__month, new_date.__day
 
-    def __add__(self, other):
-        if isinstance(other, (int, float)):
-            if other == 0:
-                return self
-            new_date = self.replace()
-            Date.__increment_days(new_date, other)
-            new_date.__ordinal = self.__calc_ordinal(new_date.year, new_date.month, new_date.day)
-            return new_date
-        if isinstance(other, Duration):
-            if other.seconds or other.subseconds:
-                raise ValueError("Cannot add a Duration with seconds or subseconds to a Date")
-            if other.months == other.days == 0:
-                return self
-            new_date = self.replace()
-            # Add days before months as the former sometimes
-            # requires the current ordinal to be correct.
-            if other.days:
-                Date.__increment_days(new_date, other.days)
-            if other.months:
-                Date.__increment_months(new_date, other.months)
-            new_date.__ordinal = self.__calc_ordinal(new_date.year, new_date.month, new_date.day)
-            return new_date
-        return NotImplemented
-
-    def __sub__(self, other):
-        if isinstance(other, Date):
-            return Duration(days=(self.ordinal - other.ordinal))
-        try:
-            return self.__add__(-other)
-        except TypeError:
-            return NotImplemented
-
-    def __lt__(self, other):
-        if isinstance(other, Date):
-            return self.ordinal < other.ordinal
-        return NotImplemented
-
-    def __gt__(self, other):
-        if isinstance(other, Date):
-            return self.ordinal > other.ordinal
-        return NotImplemented
-
-    def __repr__(self):
-        if self.__ordinal == 0:
-            return "ZeroDate"
-        return "Date(%r, %r, %r)" % self.year_month_day
-
-    def __str__(self):
-        if self.__ordinal == 0:
-            return "0000-00-00"
-        return "%04d-%02d-%02d" % self.year_month_day
-
-    @property
-    def ordinal(self):
-        """ Return the current value as an ordinal.
-        """
-        return self.__ordinal
-
-    @property
-    def year(self):
-        return self.__year
-
-    @property
-    def month(self):
-        return self.__month
-
-    @property
-    def day(self):
-        if self.__day == 0:
-            return 0
-        if self.__day >= 1:
-            return self.__day
-        return self.days_in_month(self.__year, self.__month) + self.__day + 1
-
-    @property
-    def year_month_day(self):
-        return self.year, self.month, self.day
-
-    @property
-    def year_week_day(self):
-        ordinal = self.__ordinal
-        year = self.__year
-
-        def day_of_week(o):
-            return ((o - 1) % 7) + 1
-
-        def iso_week_1(y):
-            j4 = Date(y, 1, 4)
-            return j4 + Duration(days=(1 - day_of_week(j4.ordinal)))
-
-        if ordinal >= Date(year, 12, 29).ordinal:
-            week1 = iso_week_1(year + 1)
-            if ordinal < week1.ordinal:
-                week1 = iso_week_1(year)
-            else:
-                year += 1
-        else:
-            week1 = iso_week_1(year)
-            if ordinal < week1.ordinal:
-                year -= 1
-                week1 = iso_week_1(year)
-        return year, ((ordinal - week1.ordinal) / 7 + 1), day_of_week(ordinal)
-
-    @property
-    def year_day(self):
-        return self.__year, self.ordinal - Date(self.__year, 1, 1).ordinal + 1
-
-    def replace(self, year=0, month=0, day=0):
-        """ Return a :class:`.Date` with one or more components replaced
-        with new values.
-        """
-        return Date(year or self.__year, month or self.__month, day or self.__day)
-
-    @classmethod
-    def today_utc(cls):
-        t = clock.read_utc()
-        return Date.from_ordinal(t.seconds // 86400 + 719163)
-
 
 Date.min = Date.from_ordinal(1)
 Date.max = Date.from_ordinal(3652059)
 Date.resolution = Duration(days=1)
 
-ZeroDate = Date(0, 0, 0)
+
+ZERO_DATE = Date(0, 0, 0)
 
 
+@total_ordering
 class Time(object):
     """ Time of day.
     """
@@ -540,8 +588,7 @@ class Time(object):
     __hour = 0
     __minute = 0
     __second = 0
-
-    __midnight = None
+    __tzinfo = None
 
     @classmethod
     def __normalize_hour(cls, hour):
@@ -564,42 +611,60 @@ class Time(object):
         raise ValueError("Second out of range (0..<60)")
 
     @classmethod
-    def from_ticks(cls, ticks):
-        if ticks == 0:
-            return cls.__get_midnight()
+    def from_ticks(cls, ticks, tzinfo=None):
         if 0 <= ticks < 86400:
             minute, second = nano_divmod(ticks, 60)
             hour, minute = divmod(minute, 60)
-            return cls.__new(ticks, hour, minute, second)
+            return cls.__new(ticks, hour, minute, second, tzinfo)
         raise ValueError("Ticks out of range (0..86400)")
 
     @classmethod
-    def __new(cls, ticks, hour, minute, second):
+    def __new(cls, ticks, hour, minute, second, tzinfo):
         instance = object.__new__(cls)
         instance.__ticks = float(ticks)
         instance.__hour = int(hour)
         instance.__minute = int(minute)
         instance.__second = float(second)
+        instance.__tzinfo = tzinfo
         return instance
 
-    @classmethod
-    def __get_midnight(cls):
-        if cls.__midnight is None:
-            cls.__midnight = object.__new__(cls)
-        return cls.__midnight
-
-    def __new__(cls, hour, minute, second):
-        if hour == minute == second == 0:
-            return cls.__get_midnight()
+    def __new__(cls, hour, minute, second, tzinfo=None):
         hour, minute, second = cls.__normalize_second(hour, minute, second)
         ticks = 3600 * hour + 60 * minute + second
-        return cls.__new(ticks, hour, minute, second)
+        return cls.__new(ticks, hour, minute, second, tzinfo)
+
+    def __hash__(self):
+        return hash(self.ticks) ^ hash(self.tzinfo)
+
+    def __eq__(self, other):
+        if isinstance(other, Time):
+            return self.ticks == other.ticks and self.tzinfo == other.tzinfo
+        if isinstance(other, time):
+            other_ticks = 3600 * other.hour + 60 * other.minute + other.second + (other.microsecond / 1000000)
+            return self.ticks == other_ticks
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __lt__(self, other):
+        if isinstance(other, Time):
+            if self.tzinfo == other.tzinfo:
+                return self.ticks < other.ticks
+            # TODO: compare across timezones?
+            return NotImplemented
+        if isinstance(other, time):
+            other_ticks = 3600 * other.hour + 60 * other.minute + other.second + (other.microsecond / 1000000)
+            return self.ticks < other_ticks
+        return False
 
     def __repr__(self):
-        return "Time(%r, %r, %r)" % self.hour_minute_second
+        return "Time(%r, %r, %r, %r)" % (self.hour_minute_second + (self.tzinfo,))
 
     @property
     def ticks(self):
+        """ Return the total number of seconds since midnight.
+        """
         return self.__ticks
 
     @property
@@ -618,61 +683,104 @@ class Time(object):
     def hour_minute_second(self):
         return self.__hour, self.__minute, self.__second
 
-    def replace(self, hour=0, minute=0, second=0.0):
+    @property
+    def tzinfo(self):
+        return self.__tzinfo
+
+    def replace(self, hour=None, minute=None, second=None, tzinfo=None):
         """ Return a :class:`.Time` with one or more components replaced
         with new values.
         """
-        return Time(hour or self.__hour, minute or self.__minute, second or self.__second)
+        return Time(hour or self.__hour, minute or self.__minute, second or self.__second, tzinfo or self.__tzinfo)
 
     @classmethod
     def now_utc(cls):
-        t = clock.read_utc()
+        from neotime.clock import Clock
+        t = Clock().read()
         nanoseconds = int(1000000000 * (t.seconds % 86400) + t.nanoseconds)
         return Time.from_ticks(nanoseconds / 1000000000)
 
+Time.min = Time(0, 0, 0)
+Time.max = Time(23, 59, 59.999999999)
 
-Midnight = Time(0, 0, 0)
+MIDNIGHT = Time.min
+MIDDAY = Time(12, 0, 0)
 
 
-class DateTime(object):
+@total_ordering
+class DateTime(Time):
 
     min = None
     max = None
-    resolution = None
 
-    __date = ZeroDate
-    __time = Midnight
+    __date = ZERO_DATE
 
-    __never = None
+    __zero = None
 
     @classmethod
-    def from_ordinal_ticks(cls, ordinal, ticks):
-        return cls.__new(Date.from_ordinal(ordinal), Time.from_ticks(ticks))
-
-    @classmethod
-    def __new(cls, date, time):
+    def combine(cls, date, time):
         assert isinstance(date, Date)
         assert isinstance(time, Time)
-        instance = object.__new__(cls)
+        instance = time.replace()
+        instance.__class__ = cls
         instance.__date = date
-        instance.__time = time
         return instance
 
     @classmethod
-    def __get_never(cls):
-        if cls.__never is None:
-            cls.__never = object.__new__(cls)
-        return cls.__never
+    def __get_zero(cls):
+        if cls.__zero is None:
+            cls.__zero = object.__new__(cls)
+        return cls.__zero
 
-    def __new__(cls, year, month, day, hour, minute, second):
-        if year == month == day == hour == minute == second == 0:
-            return cls.__get_never()
-        return cls.__new(Date(year, month, day), Time(hour, minute, second))
+    def __new__(cls, year, month, day, hour, minute, second, tzinfo=None):
+        if year == month == day == hour == minute == second == 0 and tzinfo is None:
+            return cls.__get_zero()
+        return cls.combine(Date(year, month, day), Time(hour, minute, second, tzinfo))
+
+    def __hash__(self):
+        return hash(self.date) ^ Time.__hash__(self)
+
+    def __eq__(self, other):
+        if isinstance(other, DateTime):
+            return self.date == other.date and Time.__eq__(self, other.time)
+        if isinstance(other, datetime):
+            return self.date == other.date() and Time.__eq__(self, other.time())
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __lt__(self, other):
+        if isinstance(other, DateTime):
+            return NotImplemented
+        if isinstance(other, datetime):
+            if self.date == other.date():
+                return self.time < other.time()
+            else:
+                return self.date < other.date()
+        return NotImplemented
+
+    def __add__(self, other):
+        from neotime.clock import T
+        if isinstance(other, timedelta):
+            if other.days >= 0:
+                t = T(self) + T((86400 * other.days + other.seconds, other.microseconds * 1000))
+            else:
+                t = T(self) - T((-86400 * other.days + other.seconds, other.microseconds * 1000))
+            days, seconds = symmetric_divmod(t.seconds, 86400)
+            date_ = Date.from_ordinal(days + 1)
+            time_ = Time.from_ticks(seconds + (t.nanoseconds / 1000000000))
+            return self.combine(date_, time_)
+        return NotImplemented
+
+    def __sub__(self, other):
+        if isinstance(other, timedelta):
+            return self.__add__(-other)
+        return NotImplemented
 
     def __repr__(self):
-        if self.__date == ZeroDate:
-            return "Never"
-        return "DateTime(%r, %r, %r, %r, %r, %r)" % (self.year_month_day + self.hour_minute_second)
+        fields = self.year_month_day + self.hour_minute_second + (self.tzinfo,)
+        return "DateTime(%r, %r, %r, %r, %r, %r, tzinfo=%r)" % fields
 
     @property
     def date(self):
@@ -704,39 +812,53 @@ class DateTime(object):
 
     @property
     def time(self):
-        return self.__time
+        return Time.replace(self)
 
-    @property
-    def hour(self):
-        return self.__time.hour
+    def __neotime_t__(self):
+        from neotime.clock import T
+        total_seconds = 0
+        for year in range(1, self.year):
+            total_seconds += 86400 * Date.days_in_year(year)
+        for month in range(1, self.month):
+            total_seconds += 86400 * Date.days_in_month(self.year, month)
+        total_seconds += 86400 * (self.day - 1)
+        seconds, nanoseconds = nano_divmod(self.ticks, 1)
+        return T((total_seconds + seconds, 1000000000 * nanoseconds))
 
-    @property
-    def minute(self):
-        return self.__time.minute
+    def relative_to(self, epoch):
+        from neotime.clock import T
+        if isinstance(epoch, DateTime):
+            return T(self) - T(epoch)
+        raise TypeError("Epoch must be a DateTime instance")
 
-    @property
-    def second(self):
-        return self.__time.second
-
-    @property
-    def hour_minute_second(self):
-        return self.__time.hour_minute_second
-
-    def replace(self, year=0, month=0, day=0, hour=0, minute=0, second=0):
-        if year == month == day == hour == minute == second == 0:
-            return self
+    def replace(self, year=None, month=None, day=None, hour=None, minute=None, second=None, tzinfo=None):
         date = self.__date.replace(year, month, day)
-        time = self.__time.replace(hour, minute, second)
-        return self.__new(date, time)
+        time = Time.replace(self, hour, minute, second, tzinfo)
+        return self.combine(date, time)
 
     @classmethod
     def now_utc(cls):
-        t = clock.read_utc()
+        from neotime.clock import Clock
+        t = Clock(offset=0).read()
         ds, ts = divmod(t.seconds, 86400)
-        date = Date.from_ordinal(ds + 719163)
+        date_ = Date.from_ordinal(ds + 719163)
         nanoseconds = int(1000000000 * ts + t.nanoseconds)
-        time = Time.from_ticks(nanoseconds / 1000000000)
-        return cls.__new(date, time)
+        time_ = Time.from_ticks(nanoseconds / 1000000000)
+        return cls.combine(date_, time_)
 
+    @classmethod
+    def now(cls, tz=None):
+        from neotime.clock import Clock
+        t = Clock().read()
+        ds, ts = divmod(t.seconds, 86400)
+        date_ = Date.from_ordinal(ds + 719163)
+        nanoseconds = int(1000000000 * ts + t.nanoseconds)
+        time_ = Time.from_ticks(nanoseconds / 1000000000)
+        return cls.combine(date_, time_)
 
-Never = DateTime(0, 0, 0, 0, 0, 0)
+DateTime.min = DateTime.combine(Date.min, Time.min)
+DateTime.max = DateTime.combine(Date.max, Time.max)
+
+ZERO_DATE_TIME = DateTime(0, 0, 0, 0, 0, 0)
+
+UNIX_EPOCH = DateTime(1970, 1, 1, 0, 0, 0)
