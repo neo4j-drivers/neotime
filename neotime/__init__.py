@@ -713,7 +713,7 @@ MIDDAY = Time(12, 0, 0)
 
 
 @total_ordering
-class DateTime(Time):
+class DateTime(object):
 
     # CONSTRUCTOR #
 
@@ -768,9 +768,9 @@ class DateTime(Time):
     def combine(cls, date, time):
         assert isinstance(date, Date)
         assert isinstance(time, Time)
-        instance = time.replace()
-        instance.__class__ = cls
+        instance = object.__new__(cls)
         instance.__date = date
+        instance.__time = time
         return instance
 
     @classmethod
@@ -814,24 +814,6 @@ class DateTime(Time):
         return self.__date.day
 
     @property
-    def hour(self):
-        return super(DateTime, self).hour
-
-    @property
-    def minute(self):
-        return super(DateTime, self).minute
-
-    @property
-    def second(self):
-        return super(DateTime, self).second
-
-    # TODO: subsecond?
-
-    @property
-    def tzinfo(self):
-        return super(DateTime, self).tzinfo
-
-    @property
     def year_month_day(self):
         return self.__date.year_month_day
 
@@ -844,13 +826,31 @@ class DateTime(Time):
         return self.__date.year_day
 
     @property
+    def hour(self):
+        return self.__time.hour
+
+    @property
+    def minute(self):
+        return self.__time.minute
+
+    @property
+    def second(self):
+        return self.__time.second
+
+    # TODO: subsecond?
+
+    @property
+    def tzinfo(self):
+        return self.__time.tzinfo
+
+    @property
     def hour_minute_second(self):
-        return super(DateTime, self).hour_minute_second
+        return self.__time.hour_minute_second
 
     # OPERATIONS #
 
     def __hash__(self):
-        return hash(self.date()) ^ Time.__hash__(self)
+        return hash(self.date()) ^ hash(self.time())
 
     def __eq__(self, other):
         if isinstance(other, (DateTime, datetime)):
@@ -892,7 +892,7 @@ class DateTime(Time):
         for month in range(1, self.month):
             total_seconds += 86400 * Date.days_in_month(self.year, month)
         total_seconds += 86400 * (self.day - 1)
-        seconds, nanoseconds = nano_divmod(self.ticks, 1)
+        seconds, nanoseconds = nano_divmod(self.__time.ticks, 1)
         return T((total_seconds + seconds, 1000000000 * nanoseconds))
 
     # INSTANCE METHODS #
@@ -901,14 +901,14 @@ class DateTime(Time):
         return self.__date
 
     def time(self):
-        return Time.replace(self, tzinfo=None)
+        return self.__time.replace(tzinfo=None)
 
     def timetz(self):
-        return Time.replace(self)
+        return self.__time
 
     def replace(self, **kwargs):
         date_ = self.__date.replace(**kwargs)
-        time_ = Time.replace(self, **kwargs)
+        time_ = self.__time.replace(**kwargs)
         return self.combine(date_, time_)
 
     def astimezone(self, tz):
