@@ -21,6 +21,8 @@ from __future__ import division, print_function
 from ctypes import CDLL, Structure, c_longlong, c_long, byref
 from time import gmtime, mktime
 
+from neotime import nano_divmod
+
 
 MIN_INT64 = -(2 ** 63)
 MAX_INT64 = (2 ** 63) - 1
@@ -32,7 +34,7 @@ class Clock(object):
 
     __clock_types = None
 
-    def __new__(cls, offset=None):
+    def __new__(cls):
         if cls.__clock_types is None:
             # Find an available clock with the best precision
             cls.__clock_types = sorted((clock for clock in Clock.__subclasses__() if clock.available()),
@@ -40,7 +42,6 @@ class Clock(object):
         if not cls.__clock_types:
             raise RuntimeError("No clocks available")
         instance = object.__new__(cls.__clock_types[0])
-        instance.__offset = T(-int(mktime(gmtime(0)))) if offset is None else T(offset)
         return instance
 
     @classmethod
@@ -51,10 +52,14 @@ class Clock(object):
     def available(cls):
         return False
 
-    def offset(self):
-        return self.__offset
+    @classmethod
+    def local_offset(cls):
+        return T(-int(mktime(gmtime(0))))
 
-    def read(self):
+    def local_time(self):
+        return self.utc_time() + self.local_offset()
+
+    def utc_time(self):
         raise NotImplementedError()
 
 
@@ -68,10 +73,10 @@ class SafeClock(Clock):
     def available(cls):
         return True
 
-    def read(self):
+    def utc_time(self):
         from time import time
-        seconds, nanoseconds = divmod(time() * 1000000000, 1000000000)
-        return T((seconds, nanoseconds)) + self.offset()
+        seconds, nanoseconds = nano_divmod(time() * 1000000000, 1000000000)
+        return T((seconds, nanoseconds))
 
 
 class LibCClock(Clock):
@@ -95,12 +100,12 @@ class LibCClock(Clock):
         else:
             return True
 
-    def read(self):
+    def utc_time(self):
         libc = CDLL("libc.so.6")
         ts = self._TimeSpec()
         status = libc.clock_gettime(0, byref(ts))
         if status == 0:
-            return T((ts.seconds, ts.nanoseconds)) + self.offset()
+            return T((ts.seconds, ts.nanoseconds))
         else:
             raise RuntimeError("clock_gettime failed with status %d" % status)
 
@@ -120,11 +125,11 @@ class PEP564Clock(Clock):
         else:
             return True
 
-    def read(self):
+    def utc_time(self):
         from time import time_ns
         t = time_ns()
         seconds, nanoseconds = divmod(t, 1000000000)
-        return T((seconds, nanoseconds)) + self.offset()
+        return T((seconds, nanoseconds))
 
 
 class T(tuple):
@@ -142,8 +147,9 @@ class T(tuple):
         if hasattr(t, "__neotime_t__"):
             return t.__neotime_t__()
         if isinstance(t, tuple) and len(t) == 2:
-            s, ns = divmod((1000000000 * t[0] + t[1]), 1000000000)
-            return tuple.__new__(cls, (int(s), int(ns)))
+            s, ns = map(int, t)
+            s, ns = nano_divmod(1000000000 * s + ns, 1000000000)
+            return tuple.__new__(cls, (s, ns))
         return tuple.__new__(cls, (int(t), 0))
 
     def __int__(self):
@@ -197,4 +203,4 @@ T.max = T((MAX_INT64, 999999999))
 
 
 if __name__ == "__main__":
-    print(Clock().read())
+    print(Clock().utc_time())

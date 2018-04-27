@@ -229,7 +229,7 @@ class Date(object):
     @classmethod
     def today(cls):
         from neotime.clock import Clock, T
-        t = Clock().read()
+        t = Clock().utc_time()
         ds = t.seconds // 86400
         return Date.from_ordinal(ds + 719163)
 
@@ -435,16 +435,18 @@ class Date(object):
     def year_day(self):
         return self.__year, self.toordinal() - Date(self.__year, 1, 1).toordinal() + 1
 
-    def replace(self, year=None, month=None, day=None):
+    def replace(self, **kwargs):
         """ Return a :class:`.Date` with one or more components replaced
         with new values.
         """
-        return Date(year or self.__year, month or self.__month, day or self.__day)
+        return Date(kwargs.get("year", self.__year),
+                    kwargs.get("month", self.__month),
+                    kwargs.get("day", self.__day))
 
     @classmethod
     def today_utc(cls):
         from neotime.clock import Clock
-        t = Clock().read()
+        t = Clock().utc_time()
         return Date.from_ordinal(t.seconds // 86400 + 719163)
 
     def timetuple(self):
@@ -641,7 +643,7 @@ class Time(object):
             return self.ticks == other.ticks and self.tzinfo == other.tzinfo
         if isinstance(other, time):
             other_ticks = 3600 * other.hour + 60 * other.minute + other.second + (other.microsecond / 1000000)
-            return self.ticks == other_ticks
+            return self.ticks == other_ticks and self.tzinfo == other.tzinfo
         return False
 
     def __ne__(self, other):
@@ -687,16 +689,19 @@ class Time(object):
     def tzinfo(self):
         return self.__tzinfo
 
-    def replace(self, hour=None, minute=None, second=None, tzinfo=None):
+    def replace(self, **kwargs):
         """ Return a :class:`.Time` with one or more components replaced
         with new values.
         """
-        return Time(hour or self.__hour, minute or self.__minute, second or self.__second, tzinfo or self.__tzinfo)
+        return Time(kwargs.get("hour", self.__hour),
+                    kwargs.get("minute", self.__minute),
+                    kwargs.get("second", self.__second),
+                    kwargs.get("tzinfo", self.__tzinfo))
 
     @classmethod
-    def now_utc(cls):
+    def utcnow(cls):
         from neotime.clock import Clock
-        t = Clock().read()
+        t = Clock().utc_time()
         nanoseconds = int(1000000000 * (t.seconds % 86400) + t.nanoseconds)
         return Time.from_ticks(nanoseconds / 1000000000)
 
@@ -710,12 +715,54 @@ MIDDAY = Time(12, 0, 0)
 @total_ordering
 class DateTime(Time):
 
-    min = None
-    max = None
+    # CONSTRUCTOR #
 
-    __date = ZERO_DATE
+    def __new__(cls, year, month, day, hour, minute, second, tzinfo=None):
+        return cls.combine(Date(year, month, day), Time(hour, minute, second, tzinfo))
 
-    __zero = None
+    # CLASS METHODS #
+
+    @classmethod
+    def today(cls):
+        return cls.now()
+
+    @classmethod
+    def now(cls, tz=None):
+        from neotime.clock import Clock
+        if tz is None:
+            return cls.from_clock_time(Clock().local_time(), UNIX_EPOCH)
+        else:
+            return tz.fromutc(cls.from_clock_time(Clock().utc_time(), UNIX_EPOCH).replace(tzinfo=tz))
+
+    @classmethod
+    def utc_now(cls):
+        from neotime.clock import Clock
+        return cls.from_clock_time(Clock().utc_time(), UNIX_EPOCH)
+
+    utcnow = utc_now
+
+    @classmethod
+    def from_timestamp(cls, timestamp, tz=None):
+        from neotime.clock import Clock, T
+        if tz is None:
+            return cls.from_clock_time(T(timestamp) + Clock().local_offset(), UNIX_EPOCH)
+        else:
+            return tz.fromutc(cls.utcfromtimestamp(timestamp).replace(tzinfo=tz))
+
+    fromtimestamp = from_timestamp
+
+    @classmethod
+    def utc_from_timestamp(cls, timestamp):
+        from neotime.clock import Clock, T
+        return cls.from_clock_time(timestamp, UNIX_EPOCH)
+
+    utcfromtimestamp = utc_from_timestamp
+
+    @classmethod
+    def from_ordinal(cls, ordinal):
+        return cls.combine(Date.from_ordinal(ordinal), MIDNIGHT)
+
+    fromordinal = from_ordinal
 
     @classmethod
     def combine(cls, date, time):
@@ -727,64 +774,32 @@ class DateTime(Time):
         return instance
 
     @classmethod
-    def __get_zero(cls):
-        if cls.__zero is None:
-            cls.__zero = object.__new__(cls)
-        return cls.__zero
+    def parse(cls, date_string, format):
+        raise NotImplementedError()
 
-    def __new__(cls, year, month, day, hour, minute, second, tzinfo=None):
-        if year == month == day == hour == minute == second == 0 and tzinfo is None:
-            return cls.__get_zero()
-        return cls.combine(Date(year, month, day), Time(hour, minute, second, tzinfo))
+    strptime = parse
 
-    def __hash__(self):
-        return hash(self.date) ^ Time.__hash__(self)
-
-    def __eq__(self, other):
-        if isinstance(other, DateTime):
-            return self.date == other.date and Time.__eq__(self, other.time)
-        if isinstance(other, datetime):
-            return self.date == other.date() and Time.__eq__(self, other.time())
-        return False
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    def __lt__(self, other):
-        if isinstance(other, DateTime):
-            return NotImplemented
-        if isinstance(other, datetime):
-            if self.date == other.date():
-                return self.time < other.time()
-            else:
-                return self.date < other.date()
-        return NotImplemented
-
-    def __add__(self, other):
+    @classmethod
+    def from_clock_time(cls, t, epoch):
+        """ Convert from a T relative to a given epoch.
+        """
         from neotime.clock import T
-        if isinstance(other, timedelta):
-            if other.days >= 0:
-                t = T(self) + T((86400 * other.days + other.seconds, other.microseconds * 1000))
-            else:
-                t = T(self) - T((-86400 * other.days + other.seconds, other.microseconds * 1000))
-            days, seconds = symmetric_divmod(t.seconds, 86400)
-            date_ = Date.from_ordinal(days + 1)
-            time_ = Time.from_ticks(seconds + (t.nanoseconds / 1000000000))
-            return self.combine(date_, time_)
-        return NotImplemented
+        t = T(t)
+        ds, ts = divmod(t.seconds, 86400)
+        date_ = Date.from_ordinal(ds + epoch.date().to_ordinal())
+        nanoseconds = int(1000000000 * ts + t.nanoseconds)
+        time_ = Time.from_ticks(nanoseconds / 1000000000)
+        return cls.combine(date_, time_)
 
-    def __sub__(self, other):
-        if isinstance(other, timedelta):
-            return self.__add__(-other)
-        return NotImplemented
+    # CLASS ATTRIBUTES #
 
-    def __repr__(self):
-        fields = self.year_month_day + self.hour_minute_second + (self.tzinfo,)
-        return "DateTime(%r, %r, %r, %r, %r, %r, tzinfo=%r)" % fields
+    min = None
 
-    @property
-    def date(self):
-        return self.__date
+    max = None
+
+    resolution = None
+
+    # INSTANCE ATTRIBUTES #
 
     @property
     def year(self):
@@ -799,6 +814,24 @@ class DateTime(Time):
         return self.__date.day
 
     @property
+    def hour(self):
+        return super(DateTime, self).hour
+
+    @property
+    def minute(self):
+        return super(DateTime, self).minute
+
+    @property
+    def second(self):
+        return super(DateTime, self).second
+
+    # TODO: subsecond?
+
+    @property
+    def tzinfo(self):
+        return super(DateTime, self).tzinfo
+
+    @property
     def year_month_day(self):
         return self.__date.year_month_day
 
@@ -811,8 +844,45 @@ class DateTime(Time):
         return self.__date.year_day
 
     @property
-    def time(self):
-        return Time.replace(self)
+    def hour_minute_second(self):
+        return super(DateTime, self).hour_minute_second
+
+    # OPERATIONS #
+
+    def __hash__(self):
+        return hash(self.date()) ^ Time.__hash__(self)
+
+    def __eq__(self, other):
+        if isinstance(other, (DateTime, datetime)):
+            return self.date() == other.date() and self.time() == other.time()
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __lt__(self, other):
+        if isinstance(other, (DateTime, datetime)):
+            if self.date() == other.date():
+                return self.time() < other.time()
+            else:
+                return self.date() < other.date()
+        return NotImplemented
+
+    def __add__(self, other):
+        from neotime.clock import T
+        if isinstance(other, timedelta):
+            t = T(self) + T((86400 * other.days + other.seconds, other.microseconds * 1000))
+            days, seconds = symmetric_divmod(t.seconds, 86400)
+            date_ = Date.from_ordinal(days + 1)
+            time_ = Time.from_ticks(seconds + (t.nanoseconds / 1000000000))
+            return self.combine(date_, time_)
+        return NotImplemented
+
+    def __sub__(self, other):
+        if isinstance(other, timedelta):
+            return self.__add__(-other)
+        # TODO: Duration, other DateTime or datetime
+        return NotImplemented
 
     def __neotime_t__(self):
         from neotime.clock import T
@@ -825,40 +895,109 @@ class DateTime(Time):
         seconds, nanoseconds = nano_divmod(self.ticks, 1)
         return T((total_seconds + seconds, 1000000000 * nanoseconds))
 
-    def relative_to(self, epoch):
-        from neotime.clock import T
-        if isinstance(epoch, DateTime):
-            return T(self) - T(epoch)
-        raise TypeError("Epoch must be a DateTime instance")
+    # INSTANCE METHODS #
 
-    def replace(self, year=None, month=None, day=None, hour=None, minute=None, second=None, tzinfo=None):
-        date = self.__date.replace(year, month, day)
-        time = Time.replace(self, hour, minute, second, tzinfo)
-        return self.combine(date, time)
+    def date(self):
+        return self.__date
 
-    @classmethod
-    def now_utc(cls):
-        from neotime.clock import Clock
-        t = Clock(offset=0).read()
-        ds, ts = divmod(t.seconds, 86400)
-        date_ = Date.from_ordinal(ds + 719163)
-        nanoseconds = int(1000000000 * ts + t.nanoseconds)
-        time_ = Time.from_ticks(nanoseconds / 1000000000)
-        return cls.combine(date_, time_)
+    def time(self):
+        return Time.replace(self, tzinfo=None)
 
-    @classmethod
-    def now(cls, tz=None):
-        from neotime.clock import Clock
-        t = Clock().read()
-        ds, ts = divmod(t.seconds, 86400)
-        date_ = Date.from_ordinal(ds + 719163)
-        nanoseconds = int(1000000000 * ts + t.nanoseconds)
-        time_ = Time.from_ticks(nanoseconds / 1000000000)
-        return cls.combine(date_, time_)
+    def timetz(self):
+        return Time.replace(self)
+
+    def replace(self, **kwargs):
+        date_ = self.__date.replace(**kwargs)
+        time_ = Time.replace(self, **kwargs)
+        return self.combine(date_, time_)
+
+    def astimezone(self, tz):
+        if self.tzinfo is None:
+            return self
+        utc = (self - self.utcoffset()).replace(tzinfo=tz)
+        return tz.fromutc(utc)
+
+    def utcoffset(self):
+        if self.tzinfo is None:
+            return None
+        value = self.tzinfo.utcoffset(self)
+        if value is None:
+            return None
+        if isinstance(value, timedelta):
+            s = value.total_seconds()
+            if not (-86400 < s < 86400):
+                raise ValueError("utcoffset must be less than a day")
+            if s % 60 != 0 or value.microseconds != 0:
+                raise ValueError("utcoffset must be a whole number of minutes")
+            return value
+        raise TypeError("utcoffset must be a timedelta")
+
+    def dst(self):
+        if self.tzinfo is None:
+            return None
+        value = self.tzinfo.dst(self)
+        if value is None:
+            return None
+        if isinstance(value, timedelta):
+            if value.days != 0:
+                raise ValueError("dst must be less than a day")
+            if value.seconds % 60 != 0 or value.microseconds != 0:
+                raise ValueError("dst must be a whole number of minutes")
+            return value
+        raise TypeError("dst must be a timedelta")
+
+    def tzname(self):
+        raise NotImplementedError()
+
+    def timetuple(self):
+        raise NotImplementedError()
+
+    def utctimetuple(self):
+        raise NotImplementedError()
+
+    utc_timetuple = utctimetuple
+
+    def to_ordinal(self):
+        raise NotImplementedError()
+
+    toordinal = to_ordinal
+
+    def weekday(self):
+        raise NotImplementedError()
+
+    def isoweekday(self):
+        raise NotImplementedError()
+
+    def isocalendar(self):
+        raise NotImplementedError()
+
+    def isoformat(self):
+        raise NotImplementedError()
+
+    def __repr__(self):
+        if self.tzinfo is None:
+            fields = self.year_month_day + self.hour_minute_second
+            return "neotime.DateTime(%r, %r, %r, %r, %r, %r)" % fields
+        else:
+            fields = self.year_month_day + self.hour_minute_second + (self.tzinfo,)
+            return "neotime.DateTime(%r, %r, %r, %r, %r, %r, tzinfo=%r)" % fields
+
+    def __str__(self):
+        raise NotImplementedError()
+
+    def ctime(self):
+        raise NotImplementedError()
+
+    def strftime(self):
+        raise NotImplementedError()
+
+    def __format__(self, format_spec):
+        raise NotImplementedError()
 
 DateTime.min = DateTime.combine(Date.min, Time.min)
 DateTime.max = DateTime.combine(Date.max, Time.max)
+DateTime.resolution = Time.resolution
 
-ZERO_DATE_TIME = DateTime(0, 0, 0, 0, 0, 0)
+ZERO_DATE_TIME = DateTime.combine(ZERO_DATE, MIDNIGHT)
 
 UNIX_EPOCH = DateTime(1970, 1, 1, 0, 0, 0)

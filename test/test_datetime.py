@@ -16,11 +16,13 @@
 # limitations under the License.
 
 
+from datetime import datetime, timedelta
 from unittest import TestCase
 
 import pytz
 
 from neotime import DateTime
+from neotime.clock import T
 
 
 class DateTimeTestCase(TestCase):
@@ -34,7 +36,27 @@ class DateTimeTestCase(TestCase):
         self.assertEqual(t.minute, 0)
         self.assertEqual(t.second, 0)
 
+    def test_conversion_to_t(self):
+        dt = DateTime(2018, 4, 26, 23, 0, 17.914390409)
+        t = T(dt)
+        self.assertEqual(t, T((63660380417, 914390409)))
+
+    def test_add_timedelta(self):
+        dt1 = DateTime(2018, 4, 26, 23, 0, 17.914390409)
+        delta = timedelta(days=1)
+        dt2 = dt1 + delta
+        self.assertEqual(dt2, DateTime(2018, 4, 27, 23, 0, 17.914390409))
+
     # TODO
-    # def test_localization(self):
-    #     eastern = pytz.timezone("US/Eastern")
-    #     eastern.localize(DateTime.now_utc())
+    def test_normalization(self):
+        eastern = pytz.timezone("US/Eastern")
+        ndt1 = eastern.normalize(DateTime(2018, 4, 27, 23, 0, 17, tzinfo=eastern))
+        ndt2 = eastern.normalize(datetime(2018, 4, 27, 23, 0, 17, tzinfo=eastern))
+        self.assertEqual(ndt1, ndt2)
+
+    # TODO
+    def test_localization(self):
+        eastern = pytz.timezone("US/Eastern")
+        ldt1 = eastern.localize(datetime(2018, 4, 27, 23, 0, 17))
+        ldt2 = eastern.localize(DateTime(2018, 4, 27, 23, 0, 17))
+        self.assertEqual(ldt1, ldt2)
