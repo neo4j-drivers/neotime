@@ -947,7 +947,9 @@ class DateTime(object):
         raise TypeError("dst must be a timedelta")
 
     def tzname(self):
-        raise NotImplementedError()
+        if self.tzinfo is None:
+            return None
+        return self.tzinfo.tzname(self)
 
     def timetuple(self):
         raise NotImplementedError()
