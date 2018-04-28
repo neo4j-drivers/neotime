@@ -21,6 +21,7 @@ a number of utility functions.
 """
 
 from __future__ import division
+from six import with_metaclass
 
 from datetime import timedelta, date, time, datetime
 from functools import total_ordering
@@ -712,13 +713,51 @@ MIDNIGHT = Time.min
 MIDDAY = Time(12, 0, 0)
 
 
+class DateTimeType(type):
+
+    def __getattr__(cls, name):
+        try:
+            return {
+                "fromordinal": cls.from_ordinal,
+                "fromtimestamp": cls.from_timestamp,
+                "strptime": cls.parse,
+                "utcfromtimestamp": cls.utc_from_timestamp,
+                "utcnow": cls.utc_now,
+            }[name]
+        except KeyError:
+            raise AttributeError("%s has no attribute %r" % (cls.__name__, name))
+
+
 @total_ordering
-class DateTime(object):
+class DateTime(with_metaclass(DateTimeType, object)):
+    """ Replacement for :class:`datetime.datetime`.
+    """
 
     # CONSTRUCTOR #
 
     def __new__(cls, year, month, day, hour, minute, second, tzinfo=None):
         return cls.combine(Date(year, month, day), Time(hour, minute, second, tzinfo))
+
+    def __getattr__(self, name):
+        """ Map standard library attribute names to local attribute names,
+        for compatibility.
+        """
+        try:
+            return {
+                "astimezone": self.as_timezone,
+                "ctime": self.c_time,
+                "isocalendar": self.iso_calendar,
+                "isoformat": self.iso_format,
+                "isoweekday": self.iso_weekday,
+                "strftime": self.__format__,
+                "toordinal": self.to_ordinal,
+                "timetuple": self.time_tuple,
+                "tzname": self.tz_name,
+                "utcoffset": self.utc_offset,
+                "utctimetuple": self.utc_time_tuple,
+            }[name]
+        except KeyError:
+            raise AttributeError("%s has no attribute %r" % (self.__name__, name))
 
     # CLASS METHODS #
 
@@ -739,8 +778,6 @@ class DateTime(object):
         from neotime.clock import Clock
         return cls.from_clock_time(Clock().utc_time(), UNIX_EPOCH)
 
-    utcnow = utc_now
-
     @classmethod
     def from_timestamp(cls, timestamp, tz=None):
         from neotime.clock import Clock, T
@@ -749,20 +786,14 @@ class DateTime(object):
         else:
             return tz.fromutc(cls.utcfromtimestamp(timestamp).replace(tzinfo=tz))
 
-    fromtimestamp = from_timestamp
-
     @classmethod
     def utc_from_timestamp(cls, timestamp):
         from neotime.clock import Clock, T
         return cls.from_clock_time(timestamp, UNIX_EPOCH)
 
-    utcfromtimestamp = utc_from_timestamp
-
     @classmethod
     def from_ordinal(cls, ordinal):
         return cls.combine(Date.from_ordinal(ordinal), MIDNIGHT)
-
-    fromordinal = from_ordinal
 
     @classmethod
     def combine(cls, date, time):
@@ -776,8 +807,6 @@ class DateTime(object):
     @classmethod
     def parse(cls, date_string, format):
         raise NotImplementedError()
-
-    strptime = parse
 
     @classmethod
     def from_clock_time(cls, t, epoch):
@@ -911,13 +940,13 @@ class DateTime(object):
         time_ = self.__time.replace(**kwargs)
         return self.combine(date_, time_)
 
-    def astimezone(self, tz):
+    def as_timezone(self, tz):
         if self.tzinfo is None:
             return self
         utc = (self - self.utcoffset()).replace(tzinfo=tz)
         return tz.fromutc(utc)
 
-    def utcoffset(self):
+    def utc_offset(self):
         if self.tzinfo is None:
             return None
         value = self.tzinfo.utcoffset(self)
@@ -946,34 +975,30 @@ class DateTime(object):
             return value
         raise TypeError("dst must be a timedelta")
 
-    def tzname(self):
+    def tz_name(self):
         if self.tzinfo is None:
             return None
         return self.tzinfo.tzname(self)
 
-    def timetuple(self):
+    def time_tuple(self):
         raise NotImplementedError()
 
-    def utctimetuple(self):
+    def utc_time_tuple(self):
         raise NotImplementedError()
-
-    utc_timetuple = utctimetuple
 
     def to_ordinal(self):
         raise NotImplementedError()
 
-    toordinal = to_ordinal
-
     def weekday(self):
         raise NotImplementedError()
 
-    def isoweekday(self):
+    def iso_weekday(self):
         raise NotImplementedError()
 
-    def isocalendar(self):
+    def iso_calendar(self):
         raise NotImplementedError()
 
-    def isoformat(self):
+    def iso_format(self):
         raise NotImplementedError()
 
     def __repr__(self):
@@ -987,10 +1012,7 @@ class DateTime(object):
     def __str__(self):
         raise NotImplementedError()
 
-    def ctime(self):
-        raise NotImplementedError()
-
-    def strftime(self):
+    def c_time(self):
         raise NotImplementedError()
 
     def __format__(self, format_spec):
