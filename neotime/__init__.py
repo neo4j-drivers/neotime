@@ -21,14 +21,16 @@ a number of utility functions.
 """
 
 from __future__ import division
-from six import with_metaclass
 
 from datetime import timedelta, date, time, datetime
 from functools import total_ordering
 from time import struct_time
 
+from six import with_metaclass
+
 from neotime.arithmetic import (nano_add, nano_sub, nano_mul, nano_div, nano_mod, nano_divmod,
                                 symmetric_divmod, round_half_to_even)
+from neotime.metaclasses import DateType, TimeType, DateTimeType
 
 
 __version__ = "1.0.0b3"
@@ -206,18 +208,6 @@ class Duration(tuple):
 
 Duration.min = Duration(months=MIN_INT64, days=MIN_INT64, seconds=MIN_INT64, subseconds=-0.999999999)
 Duration.max = Duration(months=MAX_INT64, days=MAX_INT64, seconds=MAX_INT64, subseconds=+0.999999999)
-
-
-class DateType(type):
-
-    def __getattr__(cls, name):
-        try:
-            return {
-                "fromordinal": cls.from_ordinal,
-                "fromtimestamp": cls.from_timestamp,
-            }[name]
-        except KeyError:
-            raise AttributeError("%s has no attribute %r" % (cls.__name__, name))
 
 
 @total_ordering
@@ -636,17 +626,6 @@ Date.resolution = Duration(days=1)
 ZeroDate = object.__new__(Date)
 
 
-class TimeType(type):
-
-    def __getattr__(cls, name):
-        try:
-            return {
-                "utcnow": cls.utc_now,
-            }[name]
-        except KeyError:
-            raise AttributeError("%s has no attribute %r" % (cls.__name__, name))
-
-
 @total_ordering
 class Time(with_metaclass(TimeType, object)):
     """ Time of day.
@@ -877,22 +856,6 @@ Time.max = Time(23, 59, 59.999999999)
 
 Midnight = Time.min
 Midday = Time(12, 0, 0)
-
-
-class DateTimeType(type):
-
-    def __getattr__(cls, name):
-        try:
-            return {
-                "fromordinal": cls.from_ordinal,
-                "fromtimestamp": cls.from_timestamp,
-                "strptime": cls.parse,
-                "today": cls.now,
-                "utcfromtimestamp": cls.utc_from_timestamp,
-                "utcnow": cls.utc_now,
-            }[name]
-        except KeyError:
-            raise AttributeError("%s has no attribute %r" % (cls.__name__, name))
 
 
 @total_ordering
