@@ -31,7 +31,7 @@ from neotime.arithmetic import (nano_add, nano_sub, nano_mul, nano_div, nano_mod
                                 symmetric_divmod, round_half_to_even)
 
 
-__version__ = "1.0.0b2"
+__version__ = "1.0.0b3"
 
 
 MIN_INT64 = -(2 ** 63)
