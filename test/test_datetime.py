@@ -21,7 +21,7 @@ from unittest import TestCase
 
 import pytz
 
-from neotime import DateTime
+from neotime import DateTime, MIN_YEAR, MAX_YEAR
 from neotime.clock import Clock, T
 
 
@@ -66,6 +66,48 @@ class DateTimeTestCase(TestCase):
         self.assertEqual(t.minute, 0)
         self.assertEqual(t.second, 17.914390409)
 
+    def test_year_lower_bound(self):
+        with self.assertRaises(ValueError):
+            _ = DateTime(MIN_YEAR - 1, 1, 1, 0, 0, 0)
+
+    def test_year_upper_bound(self):
+        with self.assertRaises(ValueError):
+            _ = DateTime(MAX_YEAR + 1, 1, 1, 0, 0, 0)
+
+    def test_month_lower_bound(self):
+        with self.assertRaises(ValueError):
+            _ = DateTime(2000, 0, 1, 0, 0, 0)
+
+    def test_month_upper_bound(self):
+        with self.assertRaises(ValueError):
+            _ = DateTime(2000, 13, 1, 0, 0, 0)
+
+    def test_day_zero(self):
+        with self.assertRaises(ValueError):
+            _ = DateTime(2000, 1, 0, 0, 0, 0)
+
+    def test_day_30_of_29_day_month(self):
+        with self.assertRaises(ValueError):
+            _ = DateTime(2000, 2, 30, 0, 0, 0)
+
+    def test_day_32_of_31_day_month(self):
+        with self.assertRaises(ValueError):
+            _ = DateTime(2000, 3, 32, 0, 0, 0)
+
+    def test_day_31_of_30_day_month(self):
+        with self.assertRaises(ValueError):
+            _ = DateTime(2000, 4, 31, 0, 0, 0)
+
+    def test_day_29_of_28_day_month(self):
+        with self.assertRaises(ValueError):
+            _ = DateTime(1999, 2, 29, 0, 0, 0)
+
+    def test_last_day_of_month(self):
+        t = DateTime(2000, 1, -1, 0, 0, 0)
+        self.assertEqual(t.year, 2000)
+        self.assertEqual(t.month, 1)
+        self.assertEqual(t.day, 31)
+
     def test_today(self):
         t = DateTime.today()
         self.assertEqual(t.year, 1970)
@@ -93,6 +135,42 @@ class DateTimeTestCase(TestCase):
         self.assertEqual(t.hour, 7)
         self.assertEqual(t.minute, 34)
         self.assertEqual(t.second, 56.789)
+        self.assertEqual(t.utcoffset(), timedelta(seconds=-18000))
+        self.assertEqual(t.dst(), timedelta())
+        self.assertEqual(t.tzname(), "EST")
+
+    def test_utc_now(self):
+        t = DateTime.utc_now()
+        self.assertEqual(t.year, 1970)
+        self.assertEqual(t.month, 1)
+        self.assertEqual(t.day, 1)
+        self.assertEqual(t.hour, 12)
+        self.assertEqual(t.minute, 34)
+        self.assertEqual(t.second, 56.789)
+        self.assertIsNone(t.tzinfo)
+
+    def test_from_timestamp(self):
+        t = DateTime.from_timestamp(0)
+        self.assertEqual(t.year, 1970)
+        self.assertEqual(t.month, 1)
+        self.assertEqual(t.day, 1)
+        self.assertEqual(t.hour, 0)
+        self.assertEqual(t.minute, 0)
+        self.assertEqual(t.second, 0.0)
+        self.assertIsNone(t.tzinfo)
+
+    def test_from_overflowing_timestamp(self):
+        with self.assertRaises(ValueError):
+            _ = DateTime.from_timestamp(999999999999999999)
+
+    def test_from_timestamp_with_tz(self):
+        t = DateTime.from_timestamp(0, eastern)
+        self.assertEqual(t.year, 1969)
+        self.assertEqual(t.month, 12)
+        self.assertEqual(t.day, 31)
+        self.assertEqual(t.hour, 19)
+        self.assertEqual(t.minute, 0)
+        self.assertEqual(t.second, 0.0)
         self.assertEqual(t.utcoffset(), timedelta(seconds=-18000))
         self.assertEqual(t.dst(), timedelta())
         self.assertEqual(t.tzname(), "EST")

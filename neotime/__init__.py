@@ -208,40 +208,87 @@ Duration.min = Duration(months=MIN_INT64, days=MIN_INT64, seconds=MIN_INT64, sub
 Duration.max = Duration(months=MAX_INT64, days=MAX_INT64, seconds=MAX_INT64, subseconds=+0.999999999)
 
 
+class DateType(type):
+
+    def __getattr__(cls, name):
+        try:
+            return {
+                "fromordinal": cls.from_ordinal,
+                "fromtimestamp": cls.from_timestamp,
+            }[name]
+        except KeyError:
+            raise AttributeError("%s has no attribute %r" % (cls.__name__, name))
+
+
 @total_ordering
-class Date(object):
+class Date(with_metaclass(DateType, object)):
     """
 
     0xxxxxxx xxxxxxxx           -- Date(1970-01-01..2059-09-18) -- 719163..
     10xxxxxx xxxxxxxx xxxxxxxx  -- Date(0001-01-01..9999-12-31) -- 0..
     """
 
-    min = None
-    max = None
-    resolution = None
+    # CONSTRUCTOR #
 
-    __ordinal = 0
-    __year = 0
-    __month = 0
-    __day = 0
-
-    __zero = None
+    def __new__(cls, year, month, day):
+        if year == month == day == 0:
+            return ZeroDate
+        year, month, day = cls.__normalize_day(year, month, day)
+        ordinal = cls.__calc_ordinal(year, month, day)
+        return cls.__new(ordinal, year, month, day)
 
     @classmethod
-    def today(cls):
-        from neotime.clock import Clock, T
-        t = Clock().utc_time()
-        ds = t.seconds // 86400
-        return Date.from_ordinal(ds + 719163)
+    def __new(cls, ordinal, year, month, day):
+        instance = object.__new__(cls)
+        instance.__ordinal = int(ordinal)
+        instance.__year = int(year)
+        instance.__month = int(month)
+        instance.__day = int(day)
+        return instance
+
+    def __getattr__(self, name):
+        """ Map standard library attribute names to local attribute names,
+        for compatibility.
+        """
+        try:
+            return {
+                "isocalendar": self.iso_calendar,
+                "isoformat": self.iso_format,
+                "isoweekday": self.iso_weekday,
+                "strftime": self.__format__,
+                "toordinal": self.to_ordinal,
+                "timetuple": self.time_tuple,
+            }[name]
+        except KeyError:
+            raise AttributeError("Date has no attribute %r" % name)
+
+    # CLASS METHODS #
 
     @classmethod
-    def from_timestamp(cls, timestamp):
-        from neotime.clock import Clock, T
-        t = T(timestamp) + Clock().offset()
-        ds = t.seconds // 86400
-        return Date.from_ordinal(ds + 719163)
+    def today(cls, tz=None):
+        from neotime.clock import Clock
+        if tz is None:
+            return cls.from_clock_time(Clock().local_time(), UnixEpoch)
+        else:
+            return tz.fromutc(cls.from_clock_time(Clock().utc_time(), UnixEpoch).replace(tzinfo=tz))
 
-    fromtimestamp = from_timestamp
+    @classmethod
+    def utc_today(cls):
+        from neotime.clock import Clock
+        return cls.from_clock_time(Clock().utc_time(), UnixEpoch)
+
+    @classmethod
+    def from_timestamp(cls, timestamp, tz=None):
+        from neotime.clock import Clock, T
+        if tz is None:
+            return cls.from_clock_time(T(timestamp) + Clock().local_offset(), UnixEpoch)
+        else:
+            return tz.fromutc(cls.utcfromtimestamp(timestamp).replace(tzinfo=tz))
+
+    @classmethod
+    def utc_from_timestamp(cls, timestamp):
+        from neotime.clock import Clock, T
+        return cls.from_clock_time(timestamp, UnixEpoch)
 
     @classmethod
     def from_ordinal(cls, ordinal):
@@ -253,7 +300,7 @@ class Date(object):
         :meth:`.to_ordinal`.
         """
         if ordinal == 0:
-            return cls.__get_zero()
+            return ZeroDate
         if ordinal >= 719163:
             year = 1970
             month = 1
@@ -279,7 +326,17 @@ class Date(object):
         year, month, day = cls.__normalize_day(year, month, day)
         return cls.__new(ordinal, year, month, day)
 
-    fromordinal = from_ordinal
+    @classmethod
+    def parse(cls, s):
+        raise NotImplementedError()
+
+    @classmethod
+    def from_clock_time(cls, t, epoch):
+        """ Convert from a T relative to a given epoch.
+        """
+        from neotime.clock import T
+        ds = T(t).seconds // 86400
+        return Date.from_ordinal(ds + epoch.date().to_ordinal())
 
     @classmethod
     def is_leap_year(cls, year):
@@ -303,173 +360,6 @@ class Date(object):
             return 31
         else:
             return 29 if cls.is_leap_year(year) else 28
-
-    @classmethod
-    def __new(cls, ordinal, year, month, day):
-        instance = object.__new__(cls)
-        instance.__ordinal = int(ordinal)
-        instance.__year = int(year)
-        instance.__month = int(month)
-        instance.__day = int(day)
-        return instance
-
-    def __new__(cls, year, month, day):
-        if year == month == day == 0:
-            return cls.__get_zero()
-        year, month, day = cls.__normalize_day(year, month, day)
-        ordinal = cls.__calc_ordinal(year, month, day)
-        return cls.__new(ordinal, year, month, day)
-
-    def __hash__(self):
-        return hash(self.toordinal())
-
-    def __eq__(self, other):
-        if isinstance(other, (Date, date)):
-            return self.toordinal() == other.toordinal()
-        return False
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    def __lt__(self, other):
-        if isinstance(other, (Date, date)):
-            return self.toordinal() < other.toordinal()
-        return NotImplemented
-
-    def __int__(self):
-        return int(self.toordinal())
-
-    def __add__(self, other):
-        if isinstance(other, Duration):
-            if other.seconds or other.subseconds:
-                raise ValueError("Cannot add a Duration with seconds or subseconds to a Date")
-            if other.months == other.days == 0:
-                return self
-            new_date = self.replace()
-            # Add days before months as the former sometimes
-            # requires the current ordinal to be correct.
-            if other.days:
-                Date.__increment_days(new_date, other.days)
-            if other.months:
-                Date.__increment_months(new_date, other.months)
-            new_date.__ordinal = self.__calc_ordinal(new_date.year, new_date.month, new_date.day)
-            return new_date
-        return NotImplemented
-
-    def __sub__(self, other):
-        if isinstance(other, (Date, date)):
-            return Duration(days=(self.toordinal() - other.toordinal()))
-        try:
-            return self.__add__(-other)
-        except TypeError:
-            return NotImplemented
-
-    def __repr__(self):
-        if self.__ordinal == 0:
-            return "neotime.Date(0, 0, 0)"
-        return "neotime.Date(%r, %r, %r)" % self.year_month_day
-
-    def __str__(self):
-        if self.__ordinal == 0:
-            return "0000-00-00"
-        return "%04d-%02d-%02d" % self.year_month_day
-
-    @property
-    def ordinal(self):
-        """ Return the current value as an ordinal.
-        """
-        return self.__ordinal
-
-    def to_ordinal(self):
-        """ Return the current value as an ordinal.
-        """
-        return self.__ordinal
-
-    toordinal = to_ordinal
-
-    @property
-    def year(self):
-        return self.__year
-
-    @property
-    def month(self):
-        return self.__month
-
-    @property
-    def day(self):
-        if self.__day == 0:
-            return 0
-        if self.__day >= 1:
-            return self.__day
-        return self.days_in_month(self.__year, self.__month) + self.__day + 1
-
-    @property
-    def year_month_day(self):
-        return self.year, self.month, self.day
-
-    @property
-    def year_week_day(self):
-        ordinal = self.__ordinal
-        year = self.__year
-
-        def day_of_week(o):
-            return ((o - 1) % 7) + 1
-
-        def iso_week_1(y):
-            j4 = Date(y, 1, 4)
-            return j4 + Duration(days=(1 - day_of_week(j4.toordinal())))
-
-        if ordinal >= Date(year, 12, 29).toordinal():
-            week1 = iso_week_1(year + 1)
-            if ordinal < week1.toordinal():
-                week1 = iso_week_1(year)
-            else:
-                year += 1
-        else:
-            week1 = iso_week_1(year)
-            if ordinal < week1.toordinal():
-                year -= 1
-                week1 = iso_week_1(year)
-        return year, ((ordinal - week1.toordinal()) / 7 + 1), day_of_week(ordinal)
-
-    @property
-    def year_day(self):
-        return self.__year, self.toordinal() - Date(self.__year, 1, 1).toordinal() + 1
-
-    def replace(self, **kwargs):
-        """ Return a :class:`.Date` with one or more components replaced
-        with new values.
-        """
-        return Date(kwargs.get("year", self.__year),
-                    kwargs.get("month", self.__month),
-                    kwargs.get("day", self.__day))
-
-    @classmethod
-    def today_utc(cls):
-        from neotime.clock import Clock
-        t = Clock().utc_time()
-        return Date.from_ordinal(t.seconds // 86400 + 719163)
-
-    def timetuple(self):
-        _, _, day_of_week = self.year_week_day
-        _, day_of_year = self.year_day
-        return struct_time(
-            tm_year=self.year,
-            tm_mon=self.month,
-            tm_mday=self.day,
-            tm_hour=0,
-            tm_min=0,
-            tm_sec=0,
-            tm_wday=day_of_week - 1,
-            tm_yday=day_of_year,
-            tm_isdst=-1,
-        )
-
-    @classmethod
-    def __get_zero(cls):
-        if cls.__zero is None:
-            cls.__zero = object.__new__(cls)
-        return cls.__zero
 
     @classmethod
     def __calc_ordinal(cls, year, month, day):
@@ -546,6 +436,174 @@ class Date(object):
         # TODO improve this error message
         raise ValueError("Day %d out of range (1..%d, -1, -2 ,-3)" % (day, days_in_month))
 
+    # CLASS ATTRIBUTES #
+
+    min = None
+
+    max = None
+
+    resolution = None
+
+    # INSTANCE ATTRIBUTES #
+
+    __ordinal = 0
+
+    __year = 0
+
+    __month = 0
+
+    __day = 0
+
+    @property
+    def year(self):
+        return self.__year
+
+    @property
+    def month(self):
+        return self.__month
+
+    @property
+    def day(self):
+        if self.__day == 0:
+            return 0
+        if self.__day >= 1:
+            return self.__day
+        return self.days_in_month(self.__year, self.__month) + self.__day + 1
+
+    @property
+    def year_month_day(self):
+        return self.year, self.month, self.day
+
+    @property
+    def year_week_day(self):
+        ordinal = self.__ordinal
+        year = self.__year
+
+        def day_of_week(o):
+            return ((o - 1) % 7) + 1
+
+        def iso_week_1(y):
+            j4 = Date(y, 1, 4)
+            return j4 + Duration(days=(1 - day_of_week(j4.toordinal())))
+
+        if ordinal >= Date(year, 12, 29).toordinal():
+            week1 = iso_week_1(year + 1)
+            if ordinal < week1.toordinal():
+                week1 = iso_week_1(year)
+            else:
+                year += 1
+        else:
+            week1 = iso_week_1(year)
+            if ordinal < week1.toordinal():
+                year -= 1
+                week1 = iso_week_1(year)
+        return year, ((ordinal - week1.toordinal()) / 7 + 1), day_of_week(ordinal)
+
+    @property
+    def year_day(self):
+        return self.__year, self.toordinal() - Date(self.__year, 1, 1).toordinal() + 1
+
+    # OPERATIONS #
+
+    def __hash__(self):
+        return hash(self.toordinal())
+
+    def __eq__(self, other):
+        if isinstance(other, (Date, date)):
+            return self.toordinal() == other.toordinal()
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __lt__(self, other):
+        if isinstance(other, (Date, date)):
+            return self.toordinal() < other.toordinal()
+        return NotImplemented
+
+    def __int__(self):
+        return 10000 * self.year + 100 * self.month + self.day
+
+    def __add__(self, other):
+        if isinstance(other, Duration):
+            if other.seconds or other.subseconds:
+                raise ValueError("Cannot add a Duration with seconds or subseconds to a Date")
+            if other.months == other.days == 0:
+                return self
+            new_date = self.replace()
+            # Add days before months as the former sometimes
+            # requires the current ordinal to be correct.
+            if other.days:
+                Date.__increment_days(new_date, other.days)
+            if other.months:
+                Date.__increment_months(new_date, other.months)
+            new_date.__ordinal = self.__calc_ordinal(new_date.year, new_date.month, new_date.day)
+            return new_date
+        return NotImplemented
+
+    def __sub__(self, other):
+        if isinstance(other, (Date, date)):
+            return Duration(days=(self.toordinal() - other.toordinal()))
+        try:
+            return self.__add__(-other)
+        except TypeError:
+            return NotImplemented
+
+    # INSTANCE METHODS #
+
+    def replace(self, **kwargs):
+        """ Return a :class:`.Date` with one or more components replaced
+        with new values.
+        """
+        return Date(kwargs.get("year", self.__year),
+                    kwargs.get("month", self.__month),
+                    kwargs.get("day", self.__day))
+
+    def time_tuple(self):
+        _, _, day_of_week = self.year_week_day
+        _, day_of_year = self.year_day
+        return struct_time(
+            tm_year=self.year,
+            tm_mon=self.month,
+            tm_mday=self.day,
+            tm_hour=0,
+            tm_min=0,
+            tm_sec=0,
+            tm_wday=day_of_week - 1,
+            tm_yday=day_of_year,
+            tm_isdst=-1,
+        )
+
+    def to_ordinal(self):
+        """ Return the current value as an ordinal.
+        """
+        return self.__ordinal
+
+    def weekday(self):
+        raise NotImplementedError()
+
+    def iso_weekday(self):
+        raise NotImplementedError()
+
+    def iso_calendar(self):
+        raise NotImplementedError()
+
+    def iso_format(self):
+        raise NotImplementedError()
+
+    def __repr__(self):
+        if self.__ordinal == 0:
+            return "neotime.ZERO_DATE"
+        return "neotime.Date(%r, %r, %r)" % self.year_month_day
+
+    def __str__(self):
+        if self.__ordinal == 0:
+            return "0000-00-00"
+        return "%04d-%02d-%02d" % self.year_month_day
+
+    def __format__(self, format_spec):
+        raise NotImplementedError()
+
     def __increment_months(self, months):
         years, months = symmetric_divmod(months, 12)
         year = self.__year + years
@@ -575,7 +633,7 @@ Date.max = Date.from_ordinal(3652059)
 Date.resolution = Duration(days=1)
 
 
-ZERO_DATE = Date(0, 0, 0)
+ZeroDate = object.__new__(Date)
 
 
 @total_ordering
@@ -709,8 +767,8 @@ class Time(object):
 Time.min = Time(0, 0, 0)
 Time.max = Time(23, 59, 59.999999999)
 
-MIDNIGHT = Time.min
-MIDDAY = Time(12, 0, 0)
+Midnight = Time.min
+Midday = Time(12, 0, 0)
 
 
 class DateTimeType(type):
@@ -721,6 +779,7 @@ class DateTimeType(type):
                 "fromordinal": cls.from_ordinal,
                 "fromtimestamp": cls.from_timestamp,
                 "strptime": cls.parse,
+                "today": cls.now,
                 "utcfromtimestamp": cls.utc_from_timestamp,
                 "utcnow": cls.utc_now,
             }[name]
@@ -730,12 +789,26 @@ class DateTimeType(type):
 
 @total_ordering
 class DateTime(with_metaclass(DateTimeType, object)):
-    """ Replacement for :class:`datetime.datetime`.
+    """ Regular construction of a :class:`.DateTime` object requires at
+    least the `year`, `month` and `day` arguments to be supplied. The
+    optional `hour`, `minute` and `second` arguments default to zero and
+    `tzinfo` defaults to :const:`None`.
+
+    While `year`, `month`, `day`, `hour` and `minute` accept only :func:`int`
+    values, `second` can also accept a :func:`float` value. This allows
+    sub-second values to be passed, with up to nine decimal places of
+    precision held by the object within the `second` attribute.
+
+        >>> dt = DateTime(2018, 4, 30, 12, 34, 56.789123456); dt
+        neotime.DateTime(2018, 4, 30, 12, 34, 56.789123456)
+        >>> dt.second
+        56.789123456
+
     """
 
     # CONSTRUCTOR #
 
-    def __new__(cls, year, month, day, hour, minute, second, tzinfo=None):
+    def __new__(cls, year, month, day, hour=0, minute=0, second=0.0, tzinfo=None):
         return cls.combine(Date(year, month, day), Time(hour, minute, second, tzinfo))
 
     def __getattr__(self, name):
@@ -745,55 +818,49 @@ class DateTime(with_metaclass(DateTimeType, object)):
         try:
             return {
                 "astimezone": self.as_timezone,
-                "ctime": self.c_time,
                 "isocalendar": self.iso_calendar,
                 "isoformat": self.iso_format,
                 "isoweekday": self.iso_weekday,
                 "strftime": self.__format__,
                 "toordinal": self.to_ordinal,
                 "timetuple": self.time_tuple,
-                "tzname": self.tz_name,
                 "utcoffset": self.utc_offset,
                 "utctimetuple": self.utc_time_tuple,
             }[name]
         except KeyError:
-            raise AttributeError("%s has no attribute %r" % (self.__name__, name))
+            raise AttributeError("DateTime has no attribute %r" % name)
 
     # CLASS METHODS #
-
-    @classmethod
-    def today(cls):
-        return cls.now()
 
     @classmethod
     def now(cls, tz=None):
         from neotime.clock import Clock
         if tz is None:
-            return cls.from_clock_time(Clock().local_time(), UNIX_EPOCH)
+            return cls.from_clock_time(Clock().local_time(), UnixEpoch)
         else:
-            return tz.fromutc(cls.from_clock_time(Clock().utc_time(), UNIX_EPOCH).replace(tzinfo=tz))
+            return tz.fromutc(cls.from_clock_time(Clock().utc_time(), UnixEpoch).replace(tzinfo=tz))
 
     @classmethod
     def utc_now(cls):
         from neotime.clock import Clock
-        return cls.from_clock_time(Clock().utc_time(), UNIX_EPOCH)
+        return cls.from_clock_time(Clock().utc_time(), UnixEpoch)
 
     @classmethod
     def from_timestamp(cls, timestamp, tz=None):
         from neotime.clock import Clock, T
         if tz is None:
-            return cls.from_clock_time(T(timestamp) + Clock().local_offset(), UNIX_EPOCH)
+            return cls.from_clock_time(T(timestamp) + Clock().local_offset(), UnixEpoch)
         else:
             return tz.fromutc(cls.utcfromtimestamp(timestamp).replace(tzinfo=tz))
 
     @classmethod
     def utc_from_timestamp(cls, timestamp):
         from neotime.clock import Clock, T
-        return cls.from_clock_time(timestamp, UNIX_EPOCH)
+        return cls.from_clock_time(timestamp, UnixEpoch)
 
     @classmethod
     def from_ordinal(cls, ordinal):
-        return cls.combine(Date.from_ordinal(ordinal), MIDNIGHT)
+        return cls.combine(Date.from_ordinal(ordinal), Midnight)
 
     @classmethod
     def combine(cls, date, time):
@@ -865,8 +932,6 @@ class DateTime(with_metaclass(DateTimeType, object)):
     @property
     def second(self):
         return self.__time.second
-
-    # TODO: subsecond?
 
     @property
     def tzinfo(self):
@@ -975,7 +1040,7 @@ class DateTime(with_metaclass(DateTimeType, object)):
             return value
         raise TypeError("dst must be a timedelta")
 
-    def tz_name(self):
+    def tzname(self):
         if self.tzinfo is None:
             return None
         return self.tzinfo.tzname(self)
@@ -987,19 +1052,19 @@ class DateTime(with_metaclass(DateTimeType, object)):
         raise NotImplementedError()
 
     def to_ordinal(self):
-        raise NotImplementedError()
+        return self.__date.to_ordinal()
 
     def weekday(self):
-        raise NotImplementedError()
+        return self.__date.weekday()
 
     def iso_weekday(self):
-        raise NotImplementedError()
+        return self.__date.iso_weekday()
 
     def iso_calendar(self):
-        raise NotImplementedError()
+        return self.__date.iso_calendar()
 
     def iso_format(self):
-        raise NotImplementedError()
+        return self.__date.iso_format()
 
     def __repr__(self):
         if self.tzinfo is None:
@@ -1012,9 +1077,6 @@ class DateTime(with_metaclass(DateTimeType, object)):
     def __str__(self):
         raise NotImplementedError()
 
-    def c_time(self):
-        raise NotImplementedError()
-
     def __format__(self, format_spec):
         raise NotImplementedError()
 
@@ -1022,6 +1084,5 @@ DateTime.min = DateTime.combine(Date.min, Time.min)
 DateTime.max = DateTime.combine(Date.max, Time.max)
 DateTime.resolution = Time.resolution
 
-ZERO_DATE_TIME = DateTime.combine(ZERO_DATE, MIDNIGHT)
-
-UNIX_EPOCH = DateTime(1970, 1, 1, 0, 0, 0)
+Never = DateTime.combine(ZeroDate, Midnight)
+UnixEpoch = DateTime(1970, 1, 1, 0, 0, 0)
