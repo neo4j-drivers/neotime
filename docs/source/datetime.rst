@@ -38,11 +38,11 @@ Constructors and other class methods
 Class attributes
 ================
 
-.. attribute:: dt.min
+.. attribute:: DateTime.min
 
-.. attribute:: dt.max
+.. attribute:: DateTime.max
 
-.. attribute:: dt.resolution
+.. attribute:: DateTime.resolution
 
 
 Instance attributes
@@ -89,12 +89,10 @@ Operations
 .. describe:: dt1 >= dt2
 
 .. describe:: dt1 + timedelta -> dt2
-
-.. describe:: dt1 + duration -> dt2
+              dt1 + duration -> dt2
 
 .. describe:: dt1 - timedelta -> dt2
-
-.. describe:: dt1 - duration -> dt2
+              dt1 - duration -> dt2
 
 .. describe:: dt1 - dt2 -> timedelta
 

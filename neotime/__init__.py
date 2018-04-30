@@ -636,20 +636,81 @@ Date.resolution = Duration(days=1)
 ZeroDate = object.__new__(Date)
 
 
+class TimeType(type):
+
+    def __getattr__(cls, name):
+        try:
+            return {
+                "utcnow": cls.utc_now,
+            }[name]
+        except KeyError:
+            raise AttributeError("%s has no attribute %r" % (cls.__name__, name))
+
+
 @total_ordering
-class Time(object):
+class Time(with_metaclass(TimeType, object)):
     """ Time of day.
     """
 
-    min = None
-    max = None
-    resolution = None
+    # CONSTRUCTOR #
 
-    __ticks = 0
-    __hour = 0
-    __minute = 0
-    __second = 0
-    __tzinfo = None
+    def __new__(cls, hour, minute, second, tzinfo=None):
+        hour, minute, second = cls.__normalize_second(hour, minute, second)
+        ticks = 3600 * hour + 60 * minute + second
+        return cls.__new(ticks, hour, minute, second, tzinfo)
+
+    @classmethod
+    def __new(cls, ticks, hour, minute, second, tzinfo):
+        instance = object.__new__(cls)
+        instance.__ticks = float(ticks)
+        instance.__hour = int(hour)
+        instance.__minute = int(minute)
+        instance.__second = float(second)
+        instance.__tzinfo = tzinfo
+        return instance
+
+    def __getattr__(self, name):
+        """ Map standard library attribute names to local attribute names,
+        for compatibility.
+        """
+        try:
+            return {
+            }[name]
+        except KeyError:
+            raise AttributeError("Date has no attribute %r" % name)
+
+    # CLASS METHODS #
+
+    @classmethod
+    def now(cls, tz=None):
+        from neotime.clock import Clock
+        if tz is None:
+            return cls.from_clock_time(Clock().local_time(), UnixEpoch)
+        else:
+            return tz.fromutc(cls.from_clock_time(Clock().utc_time(), UnixEpoch).replace(tzinfo=tz))
+
+    @classmethod
+    def utc_now(cls):
+        from neotime.clock import Clock
+        return cls.from_clock_time(Clock().utc_time(), UnixEpoch)
+
+    @classmethod
+    def from_ticks(cls, ticks, tz=None):
+        if 0 <= ticks < 86400:
+            minute, second = nano_divmod(ticks, 60)
+            hour, minute = divmod(minute, 60)
+            return cls.__new(ticks, hour, minute, second, tz)
+        raise ValueError("Ticks out of range (0..86400)")
+
+    @classmethod
+    def from_clock_time(cls, t, epoch):
+        """ Convert from a T relative to a given epoch.
+        """
+        from neotime.clock import T
+        t = T(t)
+        ts = t.seconds % 86400
+        nanoseconds = int(1000000000 * ts + t.nanoseconds)
+        return Time.from_ticks(epoch.time().ticks + nanoseconds / 1000000000)
 
     @classmethod
     def __normalize_hour(cls, hour):
@@ -671,56 +732,25 @@ class Time(object):
             return hour, minute, float(second)
         raise ValueError("Second out of range (0..<60)")
 
-    @classmethod
-    def from_ticks(cls, ticks, tzinfo=None):
-        if 0 <= ticks < 86400:
-            minute, second = nano_divmod(ticks, 60)
-            hour, minute = divmod(minute, 60)
-            return cls.__new(ticks, hour, minute, second, tzinfo)
-        raise ValueError("Ticks out of range (0..86400)")
+    # CLASS ATTRIBUTES #
 
-    @classmethod
-    def __new(cls, ticks, hour, minute, second, tzinfo):
-        instance = object.__new__(cls)
-        instance.__ticks = float(ticks)
-        instance.__hour = int(hour)
-        instance.__minute = int(minute)
-        instance.__second = float(second)
-        instance.__tzinfo = tzinfo
-        return instance
+    min = None
 
-    def __new__(cls, hour, minute, second, tzinfo=None):
-        hour, minute, second = cls.__normalize_second(hour, minute, second)
-        ticks = 3600 * hour + 60 * minute + second
-        return cls.__new(ticks, hour, minute, second, tzinfo)
+    max = None
 
-    def __hash__(self):
-        return hash(self.ticks) ^ hash(self.tzinfo)
+    resolution = None
 
-    def __eq__(self, other):
-        if isinstance(other, Time):
-            return self.ticks == other.ticks and self.tzinfo == other.tzinfo
-        if isinstance(other, time):
-            other_ticks = 3600 * other.hour + 60 * other.minute + other.second + (other.microsecond / 1000000)
-            return self.ticks == other_ticks and self.tzinfo == other.tzinfo
-        return False
+    # INSTANCE ATTRIBUTES #
 
-    def __ne__(self, other):
-        return not self.__eq__(other)
+    __ticks = 0
 
-    def __lt__(self, other):
-        if isinstance(other, Time):
-            if self.tzinfo == other.tzinfo:
-                return self.ticks < other.ticks
-            # TODO: compare across timezones?
-            return NotImplemented
-        if isinstance(other, time):
-            other_ticks = 3600 * other.hour + 60 * other.minute + other.second + (other.microsecond / 1000000)
-            return self.ticks < other_ticks
-        return False
+    __hour = 0
 
-    def __repr__(self):
-        return "Time(%r, %r, %r, %r)" % (self.hour_minute_second + (self.tzinfo,))
+    __minute = 0
+
+    __second = 0
+
+    __tzinfo = None
 
     @property
     def ticks(self):
@@ -748,6 +778,41 @@ class Time(object):
     def tzinfo(self):
         return self.__tzinfo
 
+    # OPERATIONS #
+
+    def __hash__(self):
+        return hash(self.ticks) ^ hash(self.tzinfo)
+
+    def __eq__(self, other):
+        if isinstance(other, Time):
+            return self.ticks == other.ticks and self.tzinfo == other.tzinfo
+        if isinstance(other, time):
+            other_ticks = 3600 * other.hour + 60 * other.minute + other.second + (other.microsecond / 1000000)
+            return self.ticks == other_ticks and self.tzinfo == other.tzinfo
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __lt__(self, other):
+        if isinstance(other, Time):
+            if self.tzinfo == other.tzinfo:
+                return self.ticks < other.ticks
+            # TODO: compare across timezones?
+            return NotImplemented
+        if isinstance(other, time):
+            other_ticks = 3600 * other.hour + 60 * other.minute + other.second + (other.microsecond / 1000000)
+            return self.ticks < other_ticks
+        return False
+
+    def __add__(self, other):
+        return NotImplemented
+
+    def __sub__(self, other):
+        return NotImplemented
+
+    # INSTANCE METHODS #
+
     def replace(self, **kwargs):
         """ Return a :class:`.Time` with one or more components replaced
         with new values.
@@ -757,12 +822,55 @@ class Time(object):
                     kwargs.get("second", self.__second),
                     kwargs.get("tzinfo", self.__tzinfo))
 
-    @classmethod
-    def utcnow(cls):
-        from neotime.clock import Clock
-        t = Clock().utc_time()
-        nanoseconds = int(1000000000 * (t.seconds % 86400) + t.nanoseconds)
-        return Time.from_ticks(nanoseconds / 1000000000)
+    def utc_offset(self):
+        if self.tzinfo is None:
+            return None
+        value = self.tzinfo.utcoffset(self)
+        if value is None:
+            return None
+        if isinstance(value, timedelta):
+            s = value.total_seconds()
+            if not (-86400 < s < 86400):
+                raise ValueError("utcoffset must be less than a day")
+            if s % 60 != 0 or value.microseconds != 0:
+                raise ValueError("utcoffset must be a whole number of minutes")
+            return value
+        raise TypeError("utcoffset must be a timedelta")
+
+    def dst(self):
+        if self.tzinfo is None:
+            return None
+        value = self.tzinfo.dst(self)
+        if value is None:
+            return None
+        if isinstance(value, timedelta):
+            if value.days != 0:
+                raise ValueError("dst must be less than a day")
+            if value.seconds % 60 != 0 or value.microseconds != 0:
+                raise ValueError("dst must be a whole number of minutes")
+            return value
+        raise TypeError("dst must be a timedelta")
+
+    def tzname(self):
+        if self.tzinfo is None:
+            return None
+        return self.tzinfo.tzname(self)
+
+    def iso_format(self):
+        raise NotImplementedError()
+
+    def __repr__(self):
+        if self.tzinfo is None:
+            return "neotime.Time(%r, %r, %r)" % self.hour_minute_second
+        else:
+            return "neotime.Time(%r, %r, %r, tzinfo=%r)" % (self.hour_minute_second + (self.tzinfo,))
+
+    def __str__(self):
+        raise NotImplementedError()
+
+    def __format__(self, format_spec):
+        raise NotImplementedError()
+
 
 Time.min = Time(0, 0, 0)
 Time.max = Time(23, 59, 59.999999999)
@@ -884,7 +992,7 @@ class DateTime(with_metaclass(DateTimeType, object)):
         ds, ts = divmod(t.seconds, 86400)
         date_ = Date.from_ordinal(ds + epoch.date().to_ordinal())
         nanoseconds = int(1000000000 * ts + t.nanoseconds)
-        time_ = Time.from_ticks(nanoseconds / 1000000000)
+        time_ = Time.from_ticks(epoch.time().ticks + (nanoseconds / 1000000000))
         return cls.combine(date_, time_)
 
     # CLASS ATTRIBUTES #
@@ -1012,38 +1120,13 @@ class DateTime(with_metaclass(DateTimeType, object)):
         return tz.fromutc(utc)
 
     def utc_offset(self):
-        if self.tzinfo is None:
-            return None
-        value = self.tzinfo.utcoffset(self)
-        if value is None:
-            return None
-        if isinstance(value, timedelta):
-            s = value.total_seconds()
-            if not (-86400 < s < 86400):
-                raise ValueError("utcoffset must be less than a day")
-            if s % 60 != 0 or value.microseconds != 0:
-                raise ValueError("utcoffset must be a whole number of minutes")
-            return value
-        raise TypeError("utcoffset must be a timedelta")
+        return self.__time.utc_offset()
 
     def dst(self):
-        if self.tzinfo is None:
-            return None
-        value = self.tzinfo.dst(self)
-        if value is None:
-            return None
-        if isinstance(value, timedelta):
-            if value.days != 0:
-                raise ValueError("dst must be less than a day")
-            if value.seconds % 60 != 0 or value.microseconds != 0:
-                raise ValueError("dst must be a whole number of minutes")
-            return value
-        raise TypeError("dst must be a timedelta")
+        return self.__time.dst()
 
     def tzname(self):
-        if self.tzinfo is None:
-            return None
-        return self.tzinfo.tzname(self)
+        return self.__time.tzname()
 
     def time_tuple(self):
         raise NotImplementedError()

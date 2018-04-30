@@ -13,6 +13,10 @@ These are always stored as -1, -2 and -3 (counting from the last day).
 This system allows some temporal arithmetic (particularly adding or subtracting months) to produce a more desirable outcome than would otherwise be produced.
 Externally, the day number is always the same as would be written on a calendar.
 
+
+Constructors and other class methods
+====================================
+
 .. class:: Date(year, month, day)
 
     Construct a new :class:`.Date` object.
@@ -29,63 +33,101 @@ Externally, the day number is always the same as would be written on a calendar.
 
     A zero date can also be acquired by passing all zeroes to the :class:`.Date` constructor or by using the :attr:`.ZeroDate` constant.
 
-.. py:classmethod:: Date.today_utc()
+.. classmethod:: Date.today()
+
+.. classmethod:: Date.utc_today()
 
     Return the current :class:`.Date` according to UTC.
 
-.. py:classmethod:: Date.from_ordinal(ordinal)
+.. classmethod:: Date.from_timestamp(timestamp, tz=None)
+
+.. classmethod:: Date.utc_from_timestamp(timestamp)
+
+.. classmethod:: Date.from_ordinal(ordinal)
 
     Construct and return a :class:`.Date` from a proleptic Gregorian ordinal.
     This is simply an integer value that corresponds to a day, starting with `1` for 1 Jan 0001.
 
-.. py:classmethod:: Date.is_leap_year(year)
+.. classmethod:: Date.parse(s)
+
+.. classmethod:: Date.from_clock_time(cls, t, epoch):
+
+.. classmethod:: Date.is_leap_year(year)
 
     Return a `bool` value that indicates whether or not `year` is a leap year.
 
-.. py:classmethod:: Date.days_in_year(year)
+.. classmethod:: Date.days_in_year(year)
 
     Return the number of days in `year`.
 
-.. py:classmethod:: Date.days_in_month(year, month)
+.. classmethod:: Date.days_in_month(year, month)
 
     Return the number of days in `month` of `year`.
 
 
-Instance methods and attributes
-===============================
+Class attributes
+================
 
-.. attribute:: date.ordinal
+.. attribute:: Date.min
 
-.. attribute:: date.year
+.. attribute:: Date.max
 
-.. attribute:: date.month
+.. attribute:: Date.resolution
 
-.. attribute:: date.day
 
-.. attribute:: date.year_month_day
+Instance attributes
+===================
 
-.. attribute:: date.year_week_day
+.. attribute:: d.year
 
-.. attribute:: date.year_day
+.. attribute:: d.month
+
+.. attribute:: d.day
+
+.. attribute:: d.year_month_day
+
+.. attribute:: d.year_week_day
+
+.. attribute:: d.year_day
 
     Return a 2-tuple of year and day number.
     This is the number of the day relative to the start of the year, with `1 Jan` corresponding to `1`.
-
-.. method:: date.replace(year=0, month=0, day=0)
-
-    Return a :class:`.Date` with one or more components replaced with new values.
 
 
 Operations
 ==========
 
-TODO
+
+Instance methods
+================
+
+.. method:: d.replace(year=self.year, month=self.month, day=self.day)
+
+    Return a :class:`.Date` with one or more components replaced with new values.
+
+.. method:: d.time_tuple()
+
+.. method:: d.to_ordinal()
+
+.. method:: d.weekday()
+
+.. method:: d.iso_weekday()
+
+.. method:: dt.iso_calendar()
+
+.. method:: d.iso_format()
+
+.. method:: d.__repr__()
+
+.. method:: d.__str__()
+
+.. method:: d.__format__()
 
 
-The :attr:`.ZeroDate` object
-============================
+Special values
+==============
 
 .. attribute:: ZeroDate
 
     A :class:`.Date` instance set to `0000-00-00`.
-    This has an :attr:`ordinal <.date.ordinal>` value of `0`.
+    This has an ordinal value of `0`.
