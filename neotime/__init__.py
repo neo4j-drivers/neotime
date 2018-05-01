@@ -273,7 +273,7 @@ class Date(with_metaclass(DateType, object)):
         if tz is None:
             return cls.from_clock_time(T(timestamp) + Clock().local_offset(), UnixEpoch)
         else:
-            return tz.fromutc(cls.utcfromtimestamp(timestamp).replace(tzinfo=tz))
+            return tz.fromutc(DateTime.utcfromtimestamp(timestamp).replace(tzinfo=tz)).date()
 
     @classmethod
     def utc_from_timestamp(cls, timestamp):
@@ -318,7 +318,23 @@ class Date(with_metaclass(DateType, object)):
 
     @classmethod
     def parse(cls, s):
-        raise NotImplementedError()
+        """ Parse a string to produce a :class:`.Date`.
+
+        Accepted formats:
+            'YYYY-MM-DD'
+
+        :param s:
+        :return:
+        """
+        try:
+            numbers = map(int, s.split("-"))
+        except (ValueError, AttributeError):
+            raise ValueError("Date string must be in format YYYY-MM-DD")
+        else:
+            numbers = list(numbers)
+            if len(numbers) == 3:
+                return cls(*numbers)
+            raise ValueError("Date string must be in format YYYY-MM-DD")
 
     @classmethod
     def from_clock_time(cls, t, epoch):
@@ -487,7 +503,7 @@ class Date(with_metaclass(DateType, object)):
             if ordinal < week1.toordinal():
                 year -= 1
                 week1 = iso_week_1(year)
-        return year, ((ordinal - week1.toordinal()) / 7 + 1), day_of_week(ordinal)
+        return year, int((ordinal - week1.toordinal()) / 7 + 1), day_of_week(ordinal)
 
     @property
     def year_day(self):

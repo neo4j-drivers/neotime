@@ -18,7 +18,12 @@
 
 from unittest import TestCase
 
-from neotime import Duration, Date
+import pytz
+
+from neotime import Duration, Date, UnixEpoch
+
+
+eastern = pytz.timezone("US/Eastern")
 
 
 class DateTestCase(TestCase):
@@ -133,6 +138,73 @@ class DateTestCase(TestCase):
     def test_cannot_use_year_higher_than_9999(self):
         with self.assertRaises(ValueError):
             _ = Date(10000, 2, 1)
+
+    def test_today(self):
+        d = Date.today()
+        self.assertIsInstance(d, Date)
+
+    def test_utc_today(self):
+        d = Date.utc_today()
+        self.assertIsInstance(d, Date)
+
+    def test_from_timestamp_without_tz(self):
+        d = Date.from_timestamp(0)
+        self.assertEqual(d, Date(1970, 1, 1))
+
+    def test_from_timestamp_with_tz(self):
+        d = Date.from_timestamp(0, tz=eastern)
+        self.assertEqual(d, Date(1969, 12, 31))
+
+    def test_utc_from_timestamp(self):
+        d = Date.utc_from_timestamp(0)
+        self.assertEqual(d, Date(1970, 1, 1))
+
+    def test_from_ordinal(self):
+        d = Date.from_ordinal(1)
+        self.assertEqual(d, Date(1, 1, 1))
+
+    def test_parse(self):
+        d = Date.parse("2018-04-30")
+        self.assertEqual(d, Date(2018, 4, 30))
+
+    def test_bad_parse_1(self):
+        with self.assertRaises(ValueError):
+            _ = Date.parse("30 April 2018")
+
+    def test_bad_parse_2(self):
+        with self.assertRaises(ValueError):
+            _ = Date.parse("2018-04")
+
+    def test_replace(self):
+        d1 = Date(2018, 4, 30)
+        d2 = d1.replace(year=2017)
+        self.assertEquals(d2, Date(2017, 4, 30))
+
+    def test_from_clock_time(self):
+        d = Date.from_clock_time((0, 0), epoch=UnixEpoch)
+        self.assertEqual(d, Date(1970, 1, 1))
+
+    def test_is_leap_year(self):
+        self.assertTrue(Date.is_leap_year(2000))
+        self.assertFalse(Date.is_leap_year(2001))
+
+    def test_days_in_year(self):
+        self.assertEqual(Date.days_in_year(2000), 366)
+        self.assertEqual(Date.days_in_year(2001), 365)
+
+    def test_days_in_month(self):
+        self.assertEqual(Date.days_in_month(2000, 1), 31)
+        self.assertEqual(Date.days_in_month(2000, 2), 29)
+        self.assertEqual(Date.days_in_month(2001, 2), 28)
+
+    def test_instance_attributes(self):
+        d = Date(2018, 4, 30)
+        self.assertEqual(d.year, 2018)
+        self.assertEqual(d.month, 4)
+        self.assertEqual(d.day, 30)
+        self.assertEqual(d.year_month_day, (2018, 4, 30))
+        self.assertEqual(d.year_week_day, (2018, 18, 1))
+        self.assertEqual(d.year_day, (2018, 120))
 
     def test_can_add_years(self):
         d1 = Date(1976, 6, 13)

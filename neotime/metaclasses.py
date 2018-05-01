@@ -23,6 +23,7 @@ class DateType(type):
             return {
                 "fromordinal": cls.from_ordinal,
                 "fromtimestamp": cls.from_timestamp,
+                "utcfromtimestamp": cls.utc_from_timestamp,
             }[name]
         except KeyError:
             raise AttributeError("%s has no attribute %r" % (cls.__name__, name))
