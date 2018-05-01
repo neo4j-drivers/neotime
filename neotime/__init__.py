@@ -33,7 +33,7 @@ from neotime.arithmetic import (nano_add, nano_sub, nano_mul, nano_div, nano_mod
 from neotime.metaclasses import DateType, TimeType, DateTimeType
 
 
-__version__ = "1.0.0b3"
+__version__ = "1.0.0b4"
 
 
 MIN_INT64 = -(2 ** 63)
@@ -806,6 +806,11 @@ class Time(with_metaclass(TimeType, object)):
     def __sub__(self, other):
         return NotImplemented
 
+    def __neotime_t__(self):
+        from neotime.clock import T
+        seconds, nanoseconds = nano_divmod(self.ticks, 1)
+        return T((seconds, 1000000000 * nanoseconds))
+
     # INSTANCE METHODS #
 
     def replace(self, **kwargs):
@@ -1060,9 +1065,22 @@ class DateTime(with_metaclass(DateTimeType, object)):
         return NotImplemented
 
     def __sub__(self, other):
+        from neotime.clock import T
+        if isinstance(other, DateTime):
+            self_month_ordinal = 12 * (self.year - 1) + self.month
+            other_month_ordinal = 12 * (other.year - 1) + other.month
+            months = self_month_ordinal - other_month_ordinal
+            days = self.day - other.day
+            t = T(self.time()) - T(other.time())
+            return Duration(months=months, days=days, seconds=t.seconds, nanoseconds=t.nanoseconds)
+        if isinstance(other, datetime):
+            days = self.to_ordinal() - other.toordinal()
+            t = T(self.time()) - T((3600 * other.hour + 60 * other.minute + other.second, other.microsecond * 1000))
+            return timedelta(days=days, seconds=t.seconds, microseconds=(t.nanoseconds // 1000))
+        if isinstance(other, Duration):
+            return NotImplemented
         if isinstance(other, timedelta):
             return self.__add__(-other)
-        # TODO: Duration, other DateTime or datetime
         return NotImplemented
 
     def __neotime_t__(self):

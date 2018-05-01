@@ -21,7 +21,7 @@ from unittest import TestCase
 
 import pytz
 
-from neotime import DateTime, MIN_YEAR, MAX_YEAR
+from neotime import DateTime, MIN_YEAR, MAX_YEAR, Duration
 from neotime.clock import Clock, T
 
 
@@ -185,6 +185,30 @@ class DateTimeTestCase(TestCase):
         delta = timedelta(days=1)
         dt2 = dt1 + delta
         self.assertEqual(dt2, DateTime(2018, 4, 27, 23, 0, 17.914390409))
+
+    def test_subtract_datetime_1(self):
+        dt1 = DateTime(2018, 4, 26, 23, 0, 17.914390409)
+        dt2 = DateTime(2018, 1, 1, 0, 0, 0.0)
+        t = dt1 - dt2
+        self.assertEqual(t, Duration(months=3, days=25, hours=23, seconds=17.914390409))
+
+    def test_subtract_datetime_2(self):
+        dt1 = DateTime(2018, 4, 1, 23, 0, 17.914390409)
+        dt2 = DateTime(2018, 1, 26, 0, 0, 0.0)
+        t = dt1 - dt2
+        self.assertEqual(t, Duration(months=3, days=-25, hours=23, seconds=17.914390409))
+
+    def test_subtract_native_datetime_1(self):
+        dt1 = DateTime(2018, 4, 26, 23, 0, 17.914390409)
+        dt2 = datetime(2018, 1, 1, 0, 0, 0)
+        t = dt1 - dt2
+        self.assertEqual(t, timedelta(days=115, hours=23, seconds=17.914390409))
+
+    def test_subtract_native_datetime_2(self):
+        dt1 = DateTime(2018, 4, 1, 23, 0, 17.914390409)
+        dt2 = datetime(2018, 1, 26, 0, 0, 0)
+        t = dt1 - dt2
+        self.assertEqual(t, timedelta(days=65, hours=23, seconds=17.914390409))
 
     def test_normalization(self):
         ndt1 = eastern.normalize(DateTime(2018, 4, 27, 23, 0, 17, tzinfo=eastern))
