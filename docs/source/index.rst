@@ -1,12 +1,11 @@
 .. module:: neotime
 
-=============================================
-``neotime`` -- High resolution temporal types
-=============================================
+===================================================
+``neotime`` -- Nanosecond resolution temporal types
+===================================================
 
-The ``neotime`` module defines classes for working with temporal data to nanosecond precision
+The ``neotime`` module defines classes for working with temporal data to nanosecond precision.
 These classes comprise a similar set to that provided by the standard library ``datetime`` module.
-Inspiration has also been drawn from `ISO-8601 <https://xkcd.com/1179/>`_.
 
 .. toctree::
     :maxdepth: 2
