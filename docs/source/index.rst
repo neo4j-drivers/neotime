@@ -11,6 +11,8 @@ These classes comprise a similar set to that provided by the standard library ``
     :maxdepth: 2
     :caption: Classes:
 
+    clocktime
+    clock
     duration
     date
     time

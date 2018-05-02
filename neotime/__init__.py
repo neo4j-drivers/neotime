@@ -43,6 +43,59 @@ MIN_YEAR = 1
 MAX_YEAR = 9999
 
 
+class ClockTime(tuple):
+    """ A count of `seconds` and `nanoseconds`. This class can be used to
+    mark a particular point in time, relative to an externally-specified
+    epoch.
+
+    The `seconds` and `nanoseconds` values provided to the constructor can
+    can have any sign but will be normalized internally into a positive or
+    negative `seconds` value along with a positive `nanoseconds` value
+    between `0` and `999,999,999`. Therefore ``ClockTime(-1, -1)`` is
+    normalized to ``ClockTime(-2, 999999999)``.
+
+    Note that the structure of a :class:`.ClockTime` object is similar to
+    the ``timespec`` struct in C.
+    """
+
+    def __new__(cls, seconds=0, nanoseconds=0):
+        seconds, nanoseconds = nano_divmod(int(1000000000 * seconds) + int(nanoseconds), 1000000000)
+        return tuple.__new__(cls, (seconds, nanoseconds))
+
+    def __add__(self, other):
+        if isinstance(other, (int, float)):
+            other = ClockTime(other)
+        if isinstance(other, ClockTime):
+            return ClockTime(self.seconds + other.seconds, self.nanoseconds + other.nanoseconds)
+        if isinstance(other, Duration):
+            if other.months or other.days:
+                raise ValueError("Cannot add Duration with months or days")
+            return ClockTime(self.seconds + other.seconds, self.nanoseconds + int(other.subseconds * 1000000000))
+        return NotImplemented
+
+    def __sub__(self, other):
+        if isinstance(other, (int, float)):
+            other = ClockTime(other)
+        if isinstance(other, ClockTime):
+            return ClockTime(self.seconds - other.seconds, self.nanoseconds - other.nanoseconds)
+        if isinstance(other, Duration):
+            if other.months or other.days:
+                raise ValueError("Cannot subtract Duration with months or days")
+            return ClockTime(self.seconds - other.seconds, self.nanoseconds - int(other.subseconds * 1000000000))
+        return NotImplemented
+
+    def __repr__(self):
+        return "ClockTime(seconds=%r, nanoseconds=%r)" % self
+
+    @property
+    def seconds(self):
+        return self[0]
+
+    @property
+    def nanoseconds(self):
+        return self[1]
+
+
 class Clock(object):
     """ Accessor for time values. This class is fulfilled by implementations
     that subclass :class:`.Clock`. These implementations are contained within
@@ -105,52 +158,6 @@ class Clock(object):
         relative to the Unix Epoch.
         """
         raise NotImplementedError("No clock implementation selected")
-
-
-class ClockTime(tuple):
-    """ Holds a count of seconds and nanoseconds.
-    This can be used to mark a specific point in time, relative to an
-    external epoch, or can store an elapsed duration.
-
-    i64, i32
-    """
-
-    def __new__(cls, seconds=0, nanoseconds=0):
-        seconds, nanoseconds = nano_divmod(int(1000000000 * seconds) + int(nanoseconds), 1000000000)
-        return tuple.__new__(cls, (seconds, nanoseconds))
-
-    def __add__(self, other):
-        if isinstance(other, (int, float)):
-            other = ClockTime(other)
-        if isinstance(other, ClockTime):
-            return ClockTime(self.seconds + other.seconds, self.nanoseconds + other.nanoseconds)
-        if isinstance(other, Duration):
-            if other.months or other.days:
-                raise ValueError("Cannot add Duration with months or days")
-            return ClockTime(self.seconds + other.seconds, self.nanoseconds + int(other.subseconds * 1000000000))
-        return NotImplemented
-
-    def __sub__(self, other):
-        if isinstance(other, (int, float)):
-            other = ClockTime(other)
-        if isinstance(other, ClockTime):
-            return ClockTime(self.seconds - other.seconds, self.nanoseconds - other.nanoseconds)
-        if isinstance(other, Duration):
-            if other.months or other.days:
-                raise ValueError("Cannot subtract Duration with months or days")
-            return ClockTime(self.seconds - other.seconds, self.nanoseconds - int(other.subseconds * 1000000000))
-        return NotImplemented
-
-    def __repr__(self):
-        return "ClockTime(seconds=%r, nanoseconds=%r)" % self
-
-    @property
-    def seconds(self):
-        return self[0]
-
-    @property
-    def nanoseconds(self):
-        return self[1]
 
 
 class Duration(tuple):
