@@ -19,6 +19,7 @@
 from __future__ import division, print_function
 
 from ctypes import CDLL, Structure, c_longlong, c_long, byref
+from platform import uname
 
 from neotime import Clock, ClockTime
 from neotime.arithmetic import nano_divmod
@@ -39,14 +40,16 @@ class SafeClock(Clock):
 
     def utc_time(self):
         from time import time
-        seconds, nanoseconds = nano_divmod(time() * 1000000000, 1000000000)
-        return ClockTime(seconds, nanoseconds)
+        seconds, nanoseconds = nano_divmod(int(time() * 1000000), 1000000)
+        return ClockTime(seconds, nanoseconds * 1000)
 
 
 class LibCClock(Clock):
     """ Clock implementation that works only on platforms that provide
     libc. This clock is guaranteed nanosecond precision.
     """
+
+    __libc = "libc.dylib" if uname()[0] == "Darwin" else "libc.so.6"
 
     class _TimeSpec(Structure):
         _fields_ = [
@@ -61,14 +64,14 @@ class LibCClock(Clock):
     @classmethod
     def available(cls):
         try:
-            _ = CDLL("libc.so.6")
+            _ = CDLL(cls.__libc)
         except OSError:
             return False
         else:
             return True
 
     def utc_time(self):
-        libc = CDLL("libc.so.6")
+        libc = CDLL(self.__libc)
         ts = self._TimeSpec()
         status = libc.clock_gettime(0, byref(ts))
         if status == 0:
