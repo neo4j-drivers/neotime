@@ -251,27 +251,38 @@ class Duration(tuple):
         return "Duration(months=%r, days=%r, seconds=%r, subseconds=%r)" % self
 
     def __str__(self):
-        terms = []
-        if self[0]:
-            terms.append("%+dmo" % self[0])
-        if self[1]:
-            terms.append("%+dd" % self[1])
-        if self[2] or self[3]:
-            s = ("%d" if self[2] == 0 else "%+d") % self[2]
-            s += ("%.9f" % abs(self[3])).strip("0")
-            if s.endswith("."):
-                s += "0"
-            terms.append("%ss" % s)
-        return " ".join(terms)
+        return self.iso_format()
 
-    def iso_format(self):
+    def iso_format(self, sep="T"):
         """
 
         :return:
         """
-        years, months, days = self.years_months_days
+        parts = []
         hours, minutes, seconds = self.hours_minutes_seconds
-        return "P%04d-%02d-%02dT%02d:%02d:%012.9f" % (years, months, days, hours, minutes, seconds)
+        if hours:
+            parts.append("%dH" % hours)
+        if minutes:
+            parts.append("%dM" % minutes)
+        if seconds:
+            if seconds == seconds // 1:
+                parts.append("%dS" % seconds)
+            else:
+                parts.append("%rS" % seconds)
+        if parts:
+            parts.insert(0, sep)
+        years, months, days = self.years_months_days
+        if days:
+            parts.insert(0, "%dD" % days)
+        if months:
+            parts.insert(0, "%dM" % months)
+        if years:
+            parts.insert(0, "%dY" % years)
+        if parts:
+            parts.insert(0, "P")
+            return "".join(parts)
+        else:
+            return "PT0S"
 
     @property
     def months(self):
@@ -745,7 +756,9 @@ class Date(with_metaclass(DateType, object)):
         raise NotImplementedError()
 
     def iso_format(self):
-        raise NotImplementedError()
+        if self.__ordinal == 0:
+            return "0000-00-00"
+        return "%04d-%02d-%02d" % self.year_month_day
 
     def __repr__(self):
         if self.__ordinal == 0:
@@ -753,9 +766,7 @@ class Date(with_metaclass(DateType, object)):
         return "neotime.Date(%r, %r, %r)" % self.year_month_day
 
     def __str__(self):
-        if self.__ordinal == 0:
-            return "0000-00-00"
-        return "%04d-%02d-%02d" % self.year_month_day
+        return self.iso_format()
 
     def __format__(self, format_spec):
         raise NotImplementedError()
@@ -980,7 +991,10 @@ class Time(with_metaclass(TimeType, object)):
         return ClockTime(seconds, 1000000000 * nanoseconds)
 
     def iso_format(self):
-        raise NotImplementedError()
+        if self.tzinfo is None:
+            return "%02d:%02d:%012.9f" % self.hour_minute_second
+        else:
+            raise NotImplementedError()
 
     def __repr__(self):
         if self.tzinfo is None:
@@ -989,7 +1003,7 @@ class Time(with_metaclass(TimeType, object)):
             return "neotime.Time(%r, %r, %r, tzinfo=%r)" % (self.hour_minute_second + (self.tzinfo,))
 
     def __str__(self):
-        raise NotImplementedError()
+        return self.iso_format()
 
     def __format__(self, format_spec):
         raise NotImplementedError()
@@ -1263,11 +1277,7 @@ class DateTime(with_metaclass(DateTimeType, object)):
         return self.__date.iso_calendar()
 
     def iso_format(self, sep="T"):
-        if self.tzinfo is None:
-            fields = self.year_month_day + (sep,) + self.hour_minute_second
-            return "%04d-%02d-%02d%s%02d:%02d:%012.9f" % fields
-        else:
-            raise NotImplementedError()
+        return sep.join([self.date().iso_format(), self.time().iso_format()])
 
     def __repr__(self):
         if self.tzinfo is None:
