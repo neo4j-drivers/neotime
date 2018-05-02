@@ -244,7 +244,7 @@ class DurationTestCase(TestCase):
 
     def test_str(self):
         d = Duration(months=2, days=3, seconds=5.7)
-        self.assertEqual(str(d), "+2mo +3d +5.7s")
+        self.assertEqual(str(d), "P2M3DT5.7S")
 
     def test_repr(self):
         d = Duration(months=2, days=3, seconds=5.7)
