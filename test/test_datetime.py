@@ -22,7 +22,7 @@ from unittest import TestCase
 import pytz
 
 from neotime import DateTime, MIN_YEAR, MAX_YEAR, Duration
-from neotime.clock import Clock, T
+from neotime.clock_implementations import Clock, ClockTime
 
 
 eastern = pytz.timezone("US/Eastern")
@@ -40,10 +40,10 @@ class FixedClock(Clock):
 
     @classmethod
     def local_offset(cls):
-        return T(0)
+        return ClockTime()
 
     def utc_time(self):
-        return T((45296, 789000000))
+        return ClockTime(45296, 789000000)
 
 
 class DateTimeTestCase(TestCase):
@@ -177,8 +177,8 @@ class DateTimeTestCase(TestCase):
 
     def test_conversion_to_t(self):
         dt = DateTime(2018, 4, 26, 23, 0, 17.914390409)
-        t = T(dt)
-        self.assertEqual(t, T((63660380417, 914390409)))
+        t = dt.to_clock_time()
+        self.assertEqual(t, ClockTime(63660380417, 914390409))
 
     def test_add_timedelta(self):
         dt1 = DateTime(2018, 4, 26, 23, 0, 17.914390409)

@@ -18,37 +18,37 @@
 
 from unittest import TestCase
 
-from neotime.clock import T
+from neotime.clock_implementations import ClockTime
 
 
-class TimeSpecTestCase(TestCase):
+class ClockTimeTestCase(TestCase):
 
-    def test_zero_timebase(self):
-        tb = T()
+    def test_zero_(self):
+        tb = ClockTime()
         self.assertEqual(tb.seconds, 0)
         self.assertEqual(tb.nanoseconds, 0)
 
     def test_only_seconds(self):
-        tb = T(123456)
+        tb = ClockTime(123456)
         self.assertEqual(tb.seconds, 123456)
         self.assertEqual(tb.nanoseconds, 0)
 
     def test_only_nanoseconds(self):
-        tb = T((0, 123456789))
+        tb = ClockTime(0, 123456789)
         self.assertEqual(tb.seconds, 0)
         self.assertEqual(tb.nanoseconds, 123456789)
 
     def test_nanoseconds_overflow(self):
-        tb = T((0, 2123456789))
+        tb = ClockTime(0, 2123456789)
         self.assertEqual(tb.seconds, 2)
         self.assertEqual(tb.nanoseconds, 123456789)
 
     def test_positive_nanoseconds(self):
-        tb = T((1, 1))
+        tb = ClockTime(1, 1)
         self.assertEqual(tb.seconds, 1)
         self.assertEqual(tb.nanoseconds, 1)
 
     def test_negative_nanoseconds(self):
-        tb = T((1, -1))
+        tb = ClockTime(1, -1)
         self.assertEqual(tb.seconds, 0)
         self.assertEqual(tb.nanoseconds, 999999999)

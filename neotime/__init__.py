@@ -20,11 +20,11 @@
 a number of utility functions.
 """
 
-from __future__ import division
+from __future__ import division, print_function
 
 from datetime import timedelta, date, time, datetime
 from functools import total_ordering
-from time import struct_time
+from time import gmtime, mktime, struct_time
 
 from six import with_metaclass
 
@@ -41,6 +41,118 @@ MAX_INT64 = (2 ** 63) - 1
 
 MIN_YEAR = 1
 MAX_YEAR = 9999
+
+
+class Clock(object):
+    """ Accessor for time values. This class is fulfilled by implementations
+    that subclass :class:`.Clock`. These implementations are contained within
+    the ``neotime.clock_implementations`` module, and are not intended to be
+    accessed directly.
+
+    Creating a new :class:`.Clock` instance will produce the highest
+    precision clock implementation available.
+
+        >>> clock = Clock()
+        >>> type(clock)
+        neotime.clock_implementations.LibCClock
+        >>> clock.local_time()
+        ClockTime(seconds=1525265942, nanoseconds=506844026)
+
+    """
+
+    __clock_types = None
+
+    def __new__(cls):
+        if cls.__clock_types is None:
+            # Find an available clock with the best precision
+            import neotime.clock_implementations
+            cls.__clock_types = sorted((clock for clock in Clock.__subclasses__() if clock.available()),
+                                       key=lambda clock: clock.precision(), reverse=True)
+        if not cls.__clock_types:
+            raise RuntimeError("No clocks available")
+        instance = object.__new__(cls.__clock_types[0])
+        return instance
+
+    @classmethod
+    def precision(cls):
+        """ The precision of this clock implementation, represented as a
+        number of decimal places. Therefore, for a nanosecond precision
+        clock, this function returns `9`.
+        """
+        raise NotImplementedError("No clock implementation selected")
+
+    @classmethod
+    def available(cls):
+        """ Return a boolean flag to indicate whether or not this clock
+        implementation is available on this platform.
+        """
+        raise NotImplementedError("No clock implementation selected")
+
+    @classmethod
+    def local_offset(cls):
+        """ The offset from UTC for local time read from this clock.
+        """
+        return ClockTime(-int(mktime(gmtime(0))))
+
+    def local_time(self):
+        """ Read and return the current local time from this clock, measured
+        relative to the Unix Epoch.
+        """
+        return self.utc_time() + self.local_offset()
+
+    def utc_time(self):
+        """ Read and return the current UTC time from this clock, measured
+        relative to the Unix Epoch.
+        """
+        raise NotImplementedError("No clock implementation selected")
+
+
+class ClockTime(tuple):
+    """ Holds a count of seconds and nanoseconds.
+    This can be used to mark a specific point in time, relative to an
+    external epoch, or can store an elapsed duration.
+
+    i64, i32
+    """
+
+    def __new__(cls, seconds=0, nanoseconds=0):
+        seconds, nanoseconds = nano_divmod(int(1000000000 * seconds) + int(nanoseconds), 1000000000)
+        return tuple.__new__(cls, (seconds, nanoseconds))
+
+    def __add__(self, other):
+        if isinstance(other, ClockTime):
+            return ClockTime(self.seconds + other.seconds, self.nanoseconds + other.nanoseconds)
+        if isinstance(other, Duration):
+            if other.months or other.days:
+                raise ValueError("Cannot add Duration with months or days")
+            return ClockTime(self.seconds + other.seconds, self.nanoseconds + int(other.subseconds * 1000000000))
+        if isinstance(other, float):
+            seconds, nanoseconds = divmod(1000000000 * other, 1000000000)
+            return ClockTime(self.seconds + seconds, self.nanoseconds + nanoseconds)
+        if isinstance(other, int):
+            return ClockTime(self.seconds + other, self.nanoseconds)
+        return NotImplemented
+
+    def __sub__(self, other):
+        if isinstance(other, ClockTime):
+            return ClockTime(self.seconds - other.seconds, self.nanoseconds - other.nanoseconds)
+        if isinstance(other, float):
+            seconds, nanoseconds = divmod(1000000000 * other, 1000000000)
+            return ClockTime(self.seconds - seconds, self.nanoseconds - nanoseconds)
+        if isinstance(other, int):
+            return ClockTime(self.seconds - other, self.nanoseconds)
+        return NotImplemented
+
+    def __repr__(self):
+        return "ClockTime(seconds=%r, nanoseconds=%r)" % self
+
+    @property
+    def seconds(self):
+        return self[0]
+
+    @property
+    def nanoseconds(self):
+        return self[1]
 
 
 class Duration(tuple):
@@ -256,7 +368,6 @@ class Date(with_metaclass(DateType, object)):
 
     @classmethod
     def today(cls, tz=None):
-        from neotime.clock import Clock
         if tz is None:
             return cls.from_clock_time(Clock().local_time(), UnixEpoch)
         else:
@@ -264,21 +375,18 @@ class Date(with_metaclass(DateType, object)):
 
     @classmethod
     def utc_today(cls):
-        from neotime.clock import Clock
         return cls.from_clock_time(Clock().utc_time(), UnixEpoch)
 
     @classmethod
     def from_timestamp(cls, timestamp, tz=None):
-        from neotime.clock import Clock, T
         if tz is None:
-            return cls.from_clock_time(T(timestamp) + Clock().local_offset(), UnixEpoch)
+            return cls.from_clock_time(ClockTime(timestamp) + Clock().local_offset(), UnixEpoch)
         else:
             return tz.fromutc(DateTime.utcfromtimestamp(timestamp).replace(tzinfo=tz)).date()
 
     @classmethod
     def utc_from_timestamp(cls, timestamp):
-        from neotime.clock import Clock, T
-        return cls.from_clock_time(timestamp, UnixEpoch)
+        return cls.from_clock_time((timestamp, 0), UnixEpoch)
 
     @classmethod
     def from_ordinal(cls, ordinal):
@@ -337,12 +445,16 @@ class Date(with_metaclass(DateType, object)):
             raise ValueError("Date string must be in format YYYY-MM-DD")
 
     @classmethod
-    def from_clock_time(cls, t, epoch):
-        """ Convert from a T relative to a given epoch.
+    def from_clock_time(cls, clock_time, epoch):
+        """ Convert from a ClockTime relative to a given epoch.
         """
-        from neotime.clock import T
-        ds = T(t).seconds // 86400
-        return Date.from_ordinal(ds + epoch.date().to_ordinal())
+        try:
+            clock_time = ClockTime(*clock_time)
+        except (TypeError, ValueError):
+            raise ValueError("Clock time must be a 2-tuple of (s, ns)")
+        else:
+            ordinal = clock_time.seconds // 86400
+            return Date.from_ordinal(ordinal + epoch.date().to_ordinal())
 
     @classmethod
     def is_leap_year(cls, year):
@@ -531,6 +643,30 @@ class Date(with_metaclass(DateType, object)):
         return 10000 * self.year + 100 * self.month + self.day
 
     def __add__(self, other):
+
+        def add_months(d, months):
+            years, months = symmetric_divmod(months, 12)
+            year = d.__year + years
+            month = d.__month + months
+            if month > 12:
+                year += 1
+                month -= 12
+            if month < 1:
+                year -= 1
+                month -= 12
+            d.__year = year
+            d.__month = month
+
+        def add_days(d, days):
+            assert 1 <= d.__day <= 28 or -28 <= d.__day <= -1
+            if d.__day >= 1:
+                new_days = d.__day + days
+                if 1 <= new_days <= 27:
+                    d.__day = new_days
+                    return
+            d0 = Date.from_ordinal(d.__ordinal + days)
+            d.__year, d.__month, d.__day = d0.__year, d0.__month, d0.__day
+
         if isinstance(other, Duration):
             if other.seconds or other.subseconds:
                 raise ValueError("Cannot add a Duration with seconds or subseconds to a Date")
@@ -540,9 +676,9 @@ class Date(with_metaclass(DateType, object)):
             # Add days before months as the former sometimes
             # requires the current ordinal to be correct.
             if other.days:
-                Date.__increment_days(new_date, other.days)
+                add_days(new_date, other.days)
             if other.months:
-                Date.__increment_months(new_date, other.months)
+                add_months(new_date, other.months)
             new_date.__ordinal = self.__calc_ordinal(new_date.year, new_date.month, new_date.day)
             return new_date
         return NotImplemented
@@ -585,6 +721,15 @@ class Date(with_metaclass(DateType, object)):
         """
         return self.__ordinal
 
+    def to_clock_time(self):
+        total_seconds = 0
+        for year in range(1, self.year):
+            total_seconds += 86400 * Date.days_in_year(year)
+        for month in range(1, self.month):
+            total_seconds += 86400 * Date.days_in_month(self.year, month)
+        total_seconds += 86400 * (self.day - 1)
+        return ClockTime(total_seconds)
+
     def weekday(self):
         raise NotImplementedError()
 
@@ -609,29 +754,6 @@ class Date(with_metaclass(DateType, object)):
 
     def __format__(self, format_spec):
         raise NotImplementedError()
-
-    def __increment_months(self, months):
-        years, months = symmetric_divmod(months, 12)
-        year = self.__year + years
-        month = self.__month + months
-        if month > 12:
-            year += 1
-            month -= 12
-        if month < 1:
-            year -= 1
-            month -= 12
-        self.__year = year
-        self.__month = month
-
-    def __increment_days(self, days):
-        assert 1 <= self.__day <= 28 or -28 <= self.__day <= -1
-        if self.__day >= 1:
-            new_days = self.__day + days
-            if 1 <= new_days <= 27:
-                self.__day = new_days
-                return
-        new_date = Date.from_ordinal(self.__ordinal + days)
-        self.__year, self.__month, self.__day = new_date.__year, new_date.__month, new_date.__day
 
 
 Date.min = Date.from_ordinal(1)
@@ -678,7 +800,6 @@ class Time(with_metaclass(TimeType, object)):
 
     @classmethod
     def now(cls, tz=None):
-        from neotime.clock import Clock
         if tz is None:
             return cls.from_clock_time(Clock().local_time(), UnixEpoch)
         else:
@@ -686,7 +807,6 @@ class Time(with_metaclass(TimeType, object)):
 
     @classmethod
     def utc_now(cls):
-        from neotime.clock import Clock
         return cls.from_clock_time(Clock().utc_time(), UnixEpoch)
 
     @classmethod
@@ -698,13 +818,12 @@ class Time(with_metaclass(TimeType, object)):
         raise ValueError("Ticks out of range (0..86400)")
 
     @classmethod
-    def from_clock_time(cls, t, epoch):
-        """ Convert from a T relative to a given epoch.
+    def from_clock_time(cls, clock_time, epoch):
+        """ Convert from a ClockTime relative to a given epoch.
         """
-        from neotime.clock import T
-        t = T(t)
-        ts = t.seconds % 86400
-        nanoseconds = int(1000000000 * ts + t.nanoseconds)
+        clock_time = ClockTime(*clock_time)
+        ts = clock_time.seconds % 86400
+        nanoseconds = int(1000000000 * ts + clock_time.nanoseconds)
         return Time.from_ticks(epoch.time().ticks + nanoseconds / 1000000000)
 
     @classmethod
@@ -806,11 +925,6 @@ class Time(with_metaclass(TimeType, object)):
     def __sub__(self, other):
         return NotImplemented
 
-    def __neotime_t__(self):
-        from neotime.clock import T
-        seconds, nanoseconds = nano_divmod(self.ticks, 1)
-        return T((seconds, 1000000000 * nanoseconds))
-
     # INSTANCE METHODS #
 
     def replace(self, **kwargs):
@@ -855,6 +969,10 @@ class Time(with_metaclass(TimeType, object)):
         if self.tzinfo is None:
             return None
         return self.tzinfo.tzname(self)
+
+    def to_clock_time(self):
+        seconds, nanoseconds = nano_divmod(self.ticks, 1)
+        return ClockTime(seconds, 1000000000 * nanoseconds)
 
     def iso_format(self):
         raise NotImplementedError()
@@ -926,7 +1044,6 @@ class DateTime(with_metaclass(DateTimeType, object)):
 
     @classmethod
     def now(cls, tz=None):
-        from neotime.clock import Clock
         if tz is None:
             return cls.from_clock_time(Clock().local_time(), UnixEpoch)
         else:
@@ -934,21 +1051,18 @@ class DateTime(with_metaclass(DateTimeType, object)):
 
     @classmethod
     def utc_now(cls):
-        from neotime.clock import Clock
         return cls.from_clock_time(Clock().utc_time(), UnixEpoch)
 
     @classmethod
     def from_timestamp(cls, timestamp, tz=None):
-        from neotime.clock import Clock, T
         if tz is None:
-            return cls.from_clock_time(T(timestamp) + Clock().local_offset(), UnixEpoch)
+            return cls.from_clock_time(ClockTime(timestamp) + Clock().local_offset(), UnixEpoch)
         else:
             return tz.fromutc(cls.utcfromtimestamp(timestamp).replace(tzinfo=tz))
 
     @classmethod
     def utc_from_timestamp(cls, timestamp):
-        from neotime.clock import Clock, T
-        return cls.from_clock_time(timestamp, UnixEpoch)
+        return cls.from_clock_time((timestamp, 0), UnixEpoch)
 
     @classmethod
     def from_ordinal(cls, ordinal):
@@ -968,16 +1082,19 @@ class DateTime(with_metaclass(DateTimeType, object)):
         raise NotImplementedError()
 
     @classmethod
-    def from_clock_time(cls, t, epoch):
-        """ Convert from a T relative to a given epoch.
+    def from_clock_time(cls, clock_time, epoch):
+        """ Convert from a ClockTime relative to a given epoch.
         """
-        from neotime.clock import T
-        t = T(t)
-        ds, ts = divmod(t.seconds, 86400)
-        date_ = Date.from_ordinal(ds + epoch.date().to_ordinal())
-        nanoseconds = int(1000000000 * ts + t.nanoseconds)
-        time_ = Time.from_ticks(epoch.time().ticks + (nanoseconds / 1000000000))
-        return cls.combine(date_, time_)
+        try:
+            seconds, nanoseconds = ClockTime(*clock_time)
+        except (TypeError, ValueError):
+            raise ValueError("Clock time must be a 2-tuple of (s, ns)")
+        else:
+            ordinal, ticks = divmod(seconds, 86400)
+            date_ = Date.from_ordinal(ordinal + epoch.date().to_ordinal())
+            nanoseconds = int(1000000000 * ticks + nanoseconds)
+            time_ = Time.from_ticks(epoch.time().ticks + (nanoseconds / 1000000000))
+            return cls.combine(date_, time_)
 
     # CLASS ATTRIBUTES #
 
@@ -1055,9 +1172,8 @@ class DateTime(with_metaclass(DateTimeType, object)):
         return NotImplemented
 
     def __add__(self, other):
-        from neotime.clock import T
         if isinstance(other, timedelta):
-            t = T(self) + T((86400 * other.days + other.seconds, other.microseconds * 1000))
+            t = self.to_clock_time() + ClockTime(86400 * other.days + other.seconds, other.microseconds * 1000)
             days, seconds = symmetric_divmod(t.seconds, 86400)
             date_ = Date.from_ordinal(days + 1)
             time_ = Time.from_ticks(seconds + (t.nanoseconds / 1000000000))
@@ -1065,34 +1181,22 @@ class DateTime(with_metaclass(DateTimeType, object)):
         return NotImplemented
 
     def __sub__(self, other):
-        from neotime.clock import T
         if isinstance(other, DateTime):
             self_month_ordinal = 12 * (self.year - 1) + self.month
             other_month_ordinal = 12 * (other.year - 1) + other.month
             months = self_month_ordinal - other_month_ordinal
             days = self.day - other.day
-            t = T(self.time()) - T(other.time())
+            t = self.time().to_clock_time() - other.time().to_clock_time()
             return Duration(months=months, days=days, seconds=t.seconds, nanoseconds=t.nanoseconds)
         if isinstance(other, datetime):
             days = self.to_ordinal() - other.toordinal()
-            t = T(self.time()) - T((3600 * other.hour + 60 * other.minute + other.second, other.microsecond * 1000))
+            t = self.time().to_clock_time() - ClockTime(3600 * other.hour + 60 * other.minute + other.second, other.microsecond * 1000)
             return timedelta(days=days, seconds=t.seconds, microseconds=(t.nanoseconds // 1000))
         if isinstance(other, Duration):
             return NotImplemented
         if isinstance(other, timedelta):
             return self.__add__(-other)
         return NotImplemented
-
-    def __neotime_t__(self):
-        from neotime.clock import T
-        total_seconds = 0
-        for year in range(1, self.year):
-            total_seconds += 86400 * Date.days_in_year(year)
-        for month in range(1, self.month):
-            total_seconds += 86400 * Date.days_in_month(self.year, month)
-        total_seconds += 86400 * (self.day - 1)
-        seconds, nanoseconds = nano_divmod(self.__time.ticks, 1)
-        return T((total_seconds + seconds, 1000000000 * nanoseconds))
 
     # INSTANCE METHODS #
 
@@ -1133,6 +1237,16 @@ class DateTime(with_metaclass(DateTimeType, object)):
 
     def to_ordinal(self):
         return self.__date.to_ordinal()
+
+    def to_clock_time(self):
+        total_seconds = 0
+        for year in range(1, self.year):
+            total_seconds += 86400 * Date.days_in_year(year)
+        for month in range(1, self.month):
+            total_seconds += 86400 * Date.days_in_month(self.year, month)
+        total_seconds += 86400 * (self.day - 1)
+        seconds, nanoseconds = nano_divmod(self.__time.ticks, 1)
+        return ClockTime(total_seconds + seconds, 1000000000 * nanoseconds)
 
     def weekday(self):
         return self.__date.weekday()
