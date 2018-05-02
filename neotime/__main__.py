@@ -16,9 +16,15 @@
 # limitations under the License.
 
 
+from __future__ import print_function
+
+
 def main():
-    from neotime import Clock
-    print(Clock().utc_time())
+    from neotime import Clock, DateTime, UnixEpoch
+    clock = Clock()
+    time = clock.utc_time()
+    print("Using %s" % type(clock).__name__)
+    print("%s -> %s" % (time, DateTime.from_clock_time(time, UnixEpoch)))
 
 
 if __name__ == "__main__":

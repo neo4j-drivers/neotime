@@ -33,7 +33,7 @@ from neotime.arithmetic import (nano_add, nano_sub, nano_mul, nano_div, nano_mod
 from neotime.metaclasses import DateType, TimeType, DateTimeType
 
 
-__version__ = "1.0.0b5"
+__version__ = "1.0.0b6"
 
 
 MIN_INT64 = -(2 ** 63)
@@ -120,27 +120,25 @@ class ClockTime(tuple):
         return tuple.__new__(cls, (seconds, nanoseconds))
 
     def __add__(self, other):
+        if isinstance(other, (int, float)):
+            other = ClockTime(other)
         if isinstance(other, ClockTime):
             return ClockTime(self.seconds + other.seconds, self.nanoseconds + other.nanoseconds)
         if isinstance(other, Duration):
             if other.months or other.days:
                 raise ValueError("Cannot add Duration with months or days")
             return ClockTime(self.seconds + other.seconds, self.nanoseconds + int(other.subseconds * 1000000000))
-        if isinstance(other, float):
-            seconds, nanoseconds = divmod(1000000000 * other, 1000000000)
-            return ClockTime(self.seconds + seconds, self.nanoseconds + nanoseconds)
-        if isinstance(other, int):
-            return ClockTime(self.seconds + other, self.nanoseconds)
         return NotImplemented
 
     def __sub__(self, other):
+        if isinstance(other, (int, float)):
+            other = ClockTime(other)
         if isinstance(other, ClockTime):
             return ClockTime(self.seconds - other.seconds, self.nanoseconds - other.nanoseconds)
-        if isinstance(other, float):
-            seconds, nanoseconds = divmod(1000000000 * other, 1000000000)
-            return ClockTime(self.seconds - seconds, self.nanoseconds - nanoseconds)
-        if isinstance(other, int):
-            return ClockTime(self.seconds - other, self.nanoseconds)
+        if isinstance(other, Duration):
+            if other.months or other.days:
+                raise ValueError("Cannot subtract Duration with months or days")
+            return ClockTime(self.seconds - other.seconds, self.nanoseconds - int(other.subseconds * 1000000000))
         return NotImplemented
 
     def __repr__(self):
@@ -1257,8 +1255,12 @@ class DateTime(with_metaclass(DateTimeType, object)):
     def iso_calendar(self):
         return self.__date.iso_calendar()
 
-    def iso_format(self):
-        return self.__date.iso_format()
+    def iso_format(self, sep="T"):
+        if self.tzinfo is None:
+            fields = self.year_month_day + (sep,) + self.hour_minute_second
+            return "%04d-%02d-%02d%s%02d:%02d:%012.9f" % fields
+        else:
+            raise NotImplementedError()
 
     def __repr__(self):
         if self.tzinfo is None:
@@ -1269,7 +1271,7 @@ class DateTime(with_metaclass(DateTimeType, object)):
             return "neotime.DateTime(%r, %r, %r, %r, %r, %r, tzinfo=%r)" % fields
 
     def __str__(self):
-        raise NotImplementedError()
+        return self.iso_format()
 
     def __format__(self, format_spec):
         raise NotImplementedError()
