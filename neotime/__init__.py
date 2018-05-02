@@ -113,17 +113,17 @@ class Clock(object):
 
     """
 
-    __clock_types = None
+    __implementations = None
 
     def __new__(cls):
-        if cls.__clock_types is None:
+        if cls.__implementations is None:
             # Find an available clock with the best precision
             import neotime.clock_implementations
-            cls.__clock_types = sorted((clock for clock in Clock.__subclasses__() if clock.available()),
-                                       key=lambda clock: clock.precision(), reverse=True)
-        if not cls.__clock_types:
-            raise RuntimeError("No clocks available")
-        instance = object.__new__(cls.__clock_types[0])
+            cls.__implementations = sorted((clock for clock in Clock.__subclasses__() if clock.available()),
+                                           key=lambda clock: clock.precision(), reverse=True)
+        if not cls.__implementations:
+            raise RuntimeError("No clock implementations available")
+        instance = object.__new__(cls.__implementations[0])
         return instance
 
     @classmethod

@@ -18,37 +18,35 @@
 
 from unittest import TestCase
 
-from neotime.clock_implementations import ClockTime
+from neotime import Clock, ClockTime
 
 
-class ClockTimeTestCase(TestCase):
+class ClockTestCase(TestCase):
 
-    def test_zero_(self):
-        tb = ClockTime()
-        self.assertEqual(tb.seconds, 0)
-        self.assertEqual(tb.nanoseconds, 0)
+    def test_no_clock_implementations(self):
+        try:
+            Clock._Clock__implementations = []
+            with self.assertRaises(RuntimeError):
+                _ = Clock()
+        finally:
+            Clock._Clock__implementations = None
 
-    def test_only_seconds(self):
-        tb = ClockTime(123456)
-        self.assertEqual(tb.seconds, 123456)
-        self.assertEqual(tb.nanoseconds, 0)
+    def test_base_clock_precision(self):
+        clock = object.__new__(Clock)
+        with self.assertRaises(NotImplementedError):
+            _ = clock.precision()
 
-    def test_only_nanoseconds(self):
-        tb = ClockTime(0, 123456789)
-        self.assertEqual(tb.seconds, 0)
-        self.assertEqual(tb.nanoseconds, 123456789)
+    def test_base_clock_available(self):
+        clock = object.__new__(Clock)
+        with self.assertRaises(NotImplementedError):
+            _ = clock.available()
 
-    def test_nanoseconds_overflow(self):
-        tb = ClockTime(0, 2123456789)
-        self.assertEqual(tb.seconds, 2)
-        self.assertEqual(tb.nanoseconds, 123456789)
+    def test_base_clock_utc_time(self):
+        clock = object.__new__(Clock)
+        with self.assertRaises(NotImplementedError):
+            _ = clock.utc_time()
 
-    def test_positive_nanoseconds(self):
-        tb = ClockTime(1, 1)
-        self.assertEqual(tb.seconds, 1)
-        self.assertEqual(tb.nanoseconds, 1)
-
-    def test_negative_nanoseconds(self):
-        tb = ClockTime(1, -1)
-        self.assertEqual(tb.seconds, 0)
-        self.assertEqual(tb.nanoseconds, 999999999)
+    def test_local_offset(self):
+        clock = object.__new__(Clock)
+        offset = clock.local_offset()
+        self.assertIsInstance(offset, ClockTime)
