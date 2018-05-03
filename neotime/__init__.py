@@ -346,7 +346,6 @@ Duration.min = Duration(months=MIN_INT64, days=MIN_INT64, seconds=MIN_INT64, sub
 Duration.max = Duration(months=MAX_INT64, days=MAX_INT64, seconds=MAX_INT64, subseconds=+0.999999999)
 
 
-@total_ordering
 class Date(with_metaclass(DateType, object)):
     """
 
@@ -657,7 +656,22 @@ class Date(with_metaclass(DateType, object)):
     def __lt__(self, other):
         if isinstance(other, (Date, date)):
             return self.toordinal() < other.toordinal()
-        return NotImplemented
+        raise TypeError("'<' not supported between instances of 'Date' and %r" % type(other).__name__)
+
+    def __le__(self, other):
+        if isinstance(other, (Date, date)):
+            return self.toordinal() <= other.toordinal()
+        raise TypeError("'<=' not supported between instances of 'Date' and %r" % type(other).__name__)
+
+    def __ge__(self, other):
+        if isinstance(other, (Date, date)):
+            return self.toordinal() >= other.toordinal()
+        raise TypeError("'>=' not supported between instances of 'Date' and %r" % type(other).__name__)
+
+    def __gt__(self, other):
+        if isinstance(other, (Date, date)):
+            return self.toordinal() > other.toordinal()
+        raise TypeError("'>' not supported between instances of 'Date' and %r" % type(other).__name__)
 
     def __add__(self, other):
 
