@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# Copyright 2018, Nigel Small & Neo4j
+# Copyright 2018, Nigel Small & Neo4j Sweden AB
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,11 +16,13 @@
 # limitations under the License.
 
 
+from datetime import date
+from time import struct_time
 from unittest import TestCase
 
 import pytz
 
-from neotime import Duration, Date, UnixEpoch
+from neotime import Duration, Date, UnixEpoch, ZeroDate
 
 
 eastern = pytz.timezone("US/Eastern")
@@ -28,12 +30,26 @@ eastern = pytz.timezone("US/Eastern")
 
 class DateTestCase(TestCase):
 
+    def test_bad_attribute(self):
+        d = Date(2000, 1, 1)
+        with self.assertRaises(AttributeError):
+            _ = d.x
+
     def test_zero_date(self):
-        t = Date(0, 0, 0)
-        self.assertEqual(t.year_month_day, (0, 0, 0))
-        self.assertEqual(t.year, 0)
-        self.assertEqual(t.month, 0)
-        self.assertEqual(t.day, 0)
+        d = Date(0, 0, 0)
+        self.assertEqual(d.year_month_day, (0, 0, 0))
+        self.assertEqual(d.year, 0)
+        self.assertEqual(d.month, 0)
+        self.assertEqual(d.day, 0)
+        self.assertIs(d, ZeroDate)
+
+    def test_zero_ordinal(self):
+        d = Date.from_ordinal(0)
+        self.assertEqual(d.year_month_day, (0, 0, 0))
+        self.assertEqual(d.year, 0)
+        self.assertEqual(d.month, 0)
+        self.assertEqual(d.day, 0)
+        self.assertIs(d, ZeroDate)
 
     def test_all_positive_days_of_month_for_31_day_month(self):
         for day in range(1, 32):
@@ -143,6 +159,10 @@ class DateTestCase(TestCase):
         d = Date.today()
         self.assertIsInstance(d, Date)
 
+    def test_today_with_tz(self):
+        d = Date.today(tz=eastern)
+        self.assertIsInstance(d, Date)
+
     def test_utc_today(self):
         d = Date.utc_today()
         self.assertIsInstance(d, Date)
@@ -175,6 +195,10 @@ class DateTestCase(TestCase):
         with self.assertRaises(ValueError):
             _ = Date.parse("2018-04")
 
+    def test_bad_parse_3(self):
+        with self.assertRaises(ValueError):
+            _ = Date.parse(object())
+
     def test_replace(self):
         d1 = Date(2018, 4, 30)
         d2 = d1.replace(year=2017)
@@ -183,6 +207,10 @@ class DateTestCase(TestCase):
     def test_from_clock_time(self):
         d = Date.from_clock_time((0, 0), epoch=UnixEpoch)
         self.assertEqual(d, Date(1970, 1, 1))
+
+    def test_bad_from_clock_time(self):
+        with self.assertRaises(ValueError):
+            _ = Date.from_clock_time(object(), None)
 
     def test_is_leap_year(self):
         self.assertTrue(Date.is_leap_year(2000))
@@ -256,6 +284,21 @@ class DateTestCase(TestCase):
         d2 = d1 + Duration(months=1) + Duration(days=1)
         self.assertEqual(d2, Date(1976, 7, 14))
 
+    def test_cannot_add_seconds(self):
+        d1 = Date(1976, 6, 13)
+        with self.assertRaises(ValueError):
+            _ = d1 + Duration(seconds=1)
+
+    def test_adding_empty_duration_returns_self(self):
+        d1 = Date(1976, 6, 13)
+        d2 = d1 + Duration()
+        self.assertIs(d1, d2)
+
+    def test_adding_object(self):
+        d1 = Date(1976, 6, 13)
+        with self.assertRaises(TypeError):
+            _ = d1 + object()
+
     def test_can_add_days_then_months(self):
         d1 = Date(1976, 6, 13)
         d2 = d1 + Duration(days=1) + Duration(months=1)
@@ -326,15 +369,35 @@ class DateTestCase(TestCase):
         d2 = d1 + Duration(months=-1)
         self.assertEqual(d2, Date(1976, 4, 30))
 
-    def test_date_difference(self):
+    def test_can_add_negative_month_for_january(self):
+        d1 = Date(1976, 1, 31)
+        d2 = d1 + Duration(months=-1)
+        self.assertEqual(d2, Date(1975, 12, 31))
+
+    def test_subtract_date(self):
         new_year = Date(2000, 1, 1)
         christmas = Date(1999, 12, 25)
         self.assertEqual(new_year - christmas, Duration(days=7))
+
+    def test_subtract_duration(self):
+        new_year = Date(2000, 1, 1)
+        christmas = Date(1999, 12, 25)
+        self.assertEqual(new_year - Duration(days=7), christmas)
+
+    def test_subtract_object(self):
+        new_year = Date(2000, 1, 1)
+        with self.assertRaises(TypeError):
+            _ = new_year - object()
 
     def test_date_less_than(self):
         new_year = Date(2000, 1, 1)
         christmas = Date(1999, 12, 25)
         self.assertLess(christmas, new_year)
+
+    def test_date_less_than_object(self):
+        d = Date(2000, 1, 1)
+        with self.assertRaises(TypeError):
+            _ = d < object()
 
     def test_date_greater_than(self):
         new_year = Date(2000, 1, 1)
@@ -350,3 +413,43 @@ class DateTestCase(TestCase):
         d1 = Date(2000, 1, 1)
         d2 = Date(2000, 1, 2)
         self.assertNotEqual(d1, d2)
+
+    def test_date_not_equal_to_object(self):
+        d1 = Date(2000, 1, 1)
+        self.assertNotEqual(d1, object())
+
+    def test_year_week_day(self):
+        for ordinal in range(Date(2001, 1, 1).to_ordinal(), Date(2008, 1, 1).to_ordinal()):
+            self.assertEqual(Date.from_ordinal(ordinal).iso_calendar(), date.fromordinal(ordinal).isocalendar())
+
+    def test_time_tuple(self):
+        d = Date(2018, 4, 30)
+        self.assertEqual(d.time_tuple(), struct_time((2018, 4, 30, 0, 0, 0, 0, 120, -1)))
+
+    def test_to_clock_time(self):
+        d = Date(2018, 4, 30)
+        self.assertEqual(d.to_clock_time(UnixEpoch), (1525046400, 0))
+        self.assertEqual(d.to_clock_time(d), (0, 0))
+        with self.assertRaises(TypeError):
+            _ = d.to_clock_time(object())
+
+    def test_weekday(self):
+        d = Date(2018, 4, 30)
+        self.assertEqual(d.weekday(), 0)
+
+    def test_iso_weekday(self):
+        d = Date(2018, 4, 30)
+        self.assertEqual(d.iso_weekday(), 1)
+
+    def test_str(self):
+        self.assertEqual(str(Date(2018, 4, 30)), "2018-04-30")
+        self.assertEqual(str(Date(0, 0, 0)), "0000-00-00")
+
+    def test_repr(self):
+        self.assertEqual(repr(Date(2018, 4, 30)), "neotime.Date(2018, 4, 30)")
+        self.assertEqual(repr(Date(0, 0, 0)), "neotime.ZeroDate")
+
+    def test_format(self):
+        d = Date(2018, 4, 30)
+        with self.assertRaises(NotImplementedError):
+            _ = d.__format__("")

@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath(os.path.join('..', '..')))
 # -- Project information -----------------------------------------------------
 
 project = 'Neotime'
-copyright = '2018, Nigel Small & Neo4j'
+copyright = '2018, Nigel Small & Neo4j Sweden AB'
 author = 'Nigel Small'
 
 # The short X.Y version

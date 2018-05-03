@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# Copyright 2018, Nigel Small & Neo4j
+# Copyright 2018, Nigel Small & Neo4j Sweden AB
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 # limitations under the License.
 
 
+from datetime import timedelta
 from unittest import TestCase
 
 from neotime import Duration
@@ -31,6 +32,7 @@ class DurationTestCase(TestCase):
         self.assertEqual(d.subseconds, 0.0)
         self.assertEqual(d.years_months_days, (0, 0, 0))
         self.assertEqual(d.hours_minutes_seconds, (0, 0, 0.0))
+        self.assertFalse(bool(d))
 
     def test_years_only(self):
         d = Duration(years=2)
@@ -50,6 +52,10 @@ class DurationTestCase(TestCase):
         self.assertEqual(d.years_months_days, (1, 8, 0))
         self.assertEqual(d.hours_minutes_seconds, (0, 0, 0.0))
 
+    def test_months_out_of_range(self):
+        with self.assertRaises(ValueError):
+            _ = Duration(months=(2**64))
+
     def test_weeks_only(self):
         d = Duration(weeks=4)
         self.assertEqual(d.months, 0)
@@ -67,6 +73,10 @@ class DurationTestCase(TestCase):
         self.assertEqual(d.subseconds, 0.0)
         self.assertEqual(d.years_months_days, (0, 0, 40))
         self.assertEqual(d.hours_minutes_seconds, (0, 0, 0.0))
+
+    def test_days_out_of_range(self):
+        with self.assertRaises(ValueError):
+            _ = Duration(days=(2**64))
 
     def test_hours_only(self):
         d = Duration(hours=10)
@@ -94,6 +104,10 @@ class DurationTestCase(TestCase):
         self.assertEqual(d.subseconds, 0.456)
         self.assertEqual(d.years_months_days, (0, 0, 0))
         self.assertEqual(d.hours_minutes_seconds, (0, 2, 3.456))
+
+    def test_seconds_out_of_range(self):
+        with self.assertRaises(ValueError):
+            _ = Duration(seconds=(2**64))
 
     def test_subseconds_only(self):
         d = Duration(subseconds=123.456)
@@ -156,6 +170,7 @@ class DurationTestCase(TestCase):
         self.assertEqual(d.subseconds, 0.789)
         self.assertEqual(d.years_months_days, (1, 2, 3))
         self.assertEqual(d.hours_minutes_seconds, (4, 5, 6.789))
+        self.assertTrue(bool(d))
 
     def test_full_negative(self):
         d = Duration(years=-1, months=-2, days=-3, hours=-4, minutes=-5, seconds=-6.789)
@@ -165,6 +180,7 @@ class DurationTestCase(TestCase):
         self.assertEqual(d.subseconds, -0.789)
         self.assertEqual(d.years_months_days, (-1, -2, -3))
         self.assertEqual(d.hours_minutes_seconds, (-4, -5, -6.789))
+        self.assertTrue(bool(d))
 
     def test_negative_positive_negative(self):
         d = Duration(years=-1, months=-2, days=3, hours=-4, minutes=-5, seconds=-6.789)
@@ -184,15 +200,33 @@ class DurationTestCase(TestCase):
         self.assertEqual(d.years_months_days, (1, 2, -3))
         self.assertEqual(d.hours_minutes_seconds, (4, 5, 6.789))
 
-    def test_addition(self):
+    def test_add_duration(self):
         d1 = Duration(months=2, days=3, seconds=5.7)
         d2 = Duration(months=7, days=5, seconds=3.2)
         self.assertEqual(d1 + d2, Duration(months=9, days=8, seconds=8.9))
 
-    def test_subtraction(self):
+    def test_add_timedelta(self):
+        d1 = Duration(months=2, days=3, seconds=5.7)
+        td = timedelta(days=5, seconds=3.2)
+        self.assertEqual(d1 + td, Duration(months=2, days=8, seconds=8.9))
+
+    def test_add_object(self):
+        with self.assertRaises(TypeError):
+            _ = Duration(months=2, days=3, seconds=5.7) + object()
+
+    def test_subtract_duration(self):
         d1 = Duration(months=2, days=3, seconds=5.7)
         d2 = Duration(months=7, days=5, seconds=3.2)
         self.assertEqual(d1 - d2, Duration(months=-5, days=-2, seconds=2.5))
+
+    def test_subtract_timedelta(self):
+        d1 = Duration(months=2, days=3, seconds=5.7)
+        td = timedelta(days=5, seconds=3.2)
+        self.assertEqual(d1 - td, Duration(months=2, days=-2, seconds=2.5))
+
+    def test_subtract_object(self):
+        with self.assertRaises(TypeError):
+            _ = Duration(months=2, days=3, seconds=5.7) - object()
 
     def test_multiplication_by_int(self):
         d1 = Duration(months=2, days=3, seconds=5.7)
@@ -204,21 +238,37 @@ class DurationTestCase(TestCase):
         f = 5.5
         self.assertEqual(d1 * f, Duration(months=11, days=16, seconds=31.35))
 
+    def test_multiplication_by_object(self):
+        with self.assertRaises(TypeError):
+            _ = Duration(months=2, days=3, seconds=5.7) * object()
+
     def test_floor_division_by_int(self):
         d1 = Duration(months=11, days=33, seconds=55.77)
         i = 2
         self.assertEqual(d1 // i, Duration(months=5, days=16, seconds=27.0))
+
+    def test_floor_division_by_object(self):
+        with self.assertRaises(TypeError):
+            _ = Duration(months=2, days=3, seconds=5.7) // object()
 
     def test_modulus_by_int(self):
         d1 = Duration(months=11, days=33, seconds=55.77)
         i = 2
         self.assertEqual(d1 % i, Duration(months=1, days=1, seconds=1.77))
 
+    def test_modulus_by_object(self):
+        with self.assertRaises(TypeError):
+            _ = Duration(months=2, days=3, seconds=5.7) % object()
+
     def test_floor_division_and_modulus_by_int(self):
         d1 = Duration(months=11, days=33, seconds=55.77)
         i = 2
         self.assertEqual(divmod(d1, i), (Duration(months=5, days=16, seconds=27.0),
                                          Duration(months=1, days=1, seconds=1.77)))
+
+    def test_floor_division_and_modulus_by_object(self):
+        with self.assertRaises(TypeError):
+            _ = divmod(Duration(months=2, days=3, seconds=5.7), object())
 
     def test_true_division_by_int(self):
         d1 = Duration(months=11, days=33, seconds=55.77)
@@ -229,6 +279,10 @@ class DurationTestCase(TestCase):
         d1 = Duration(months=11, days=33, seconds=55.77)
         f = 2.5
         self.assertEqual(d1 / f, Duration(months=4, days=13, seconds=22.308))
+
+    def test_true_division_by_object(self):
+        with self.assertRaises(TypeError):
+            _ = Duration(months=2, days=3, seconds=5.7) / object()
 
     def test_unary_plus(self):
         d = Duration(months=11, days=33, seconds=55.77)
@@ -243,8 +297,15 @@ class DurationTestCase(TestCase):
         self.assertEqual(abs(d), Duration(months=11, days=33, seconds=55.77))
 
     def test_str(self):
-        d = Duration(months=2, days=3, seconds=5.7)
-        self.assertEqual(str(d), "P2M3DT5.7S")
+        self.assertEqual(str(Duration()), "PT0S")
+        self.assertEqual(str(Duration(years=1, months=2)), "P1Y2M")
+        self.assertEqual(str(Duration(years=-1, months=2)), "P-10M")
+        self.assertEqual(str(Duration(months=-13)), "P-1Y-1M")
+        self.assertEqual(str(Duration(months=2, days=3, seconds=5.7)), "P2M3DT5.7S")
+        self.assertEqual(str(Duration(hours=12, minutes=34)), "PT12H34M")
+        self.assertEqual(str(Duration(seconds=59)), "PT59S")
+        self.assertEqual(str(Duration(seconds=0.123456789)), "PT0.123456789S")
+        self.assertEqual(str(Duration(seconds=-0.123456789)), "PT-0.123456789S")
 
     def test_repr(self):
         d = Duration(months=2, days=3, seconds=5.7)

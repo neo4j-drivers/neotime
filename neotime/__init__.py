@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# Copyright 2018, Nigel Small & Neo4j
+# Copyright 2018, Nigel Small & Neo4j Sweden AB
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -173,10 +173,10 @@ class Duration(tuple):
                 subseconds=0, milliseconds=0, microseconds=0, nanoseconds=0):
         mo = int(12 * years + months)
         if mo < MIN_INT64 or mo > MAX_INT64:
-            raise ValueError("Month out of range")
+            raise ValueError("Months value out of range")
         d = int(7 * weeks + days)
         if d < MIN_INT64 or d > MAX_INT64:
-            raise ValueError("Day out of range")
+            raise ValueError("Days value out of range")
         s = (int(3600000000000 * hours) +
              int(60000000000 * minutes) +
              int(1000000000 * seconds) +
@@ -186,7 +186,7 @@ class Duration(tuple):
              int(nanoseconds))
         s, ss = symmetric_divmod(s, 1000000000)
         if s < MIN_INT64 or s > MAX_INT64:
-            raise ValueError("Seconds out of range")
+            raise ValueError("Seconds value out of range")
         return tuple.__new__(cls, (mo, d, s, ss / 1000000000))
 
     def __bool__(self):
@@ -195,46 +195,54 @@ class Duration(tuple):
     __nonzero__ = __bool__
 
     def __add__(self, other):
-        if not isinstance(other, Duration):
-            return NotImplemented
-        return Duration(months=self[0] + int(other[0]), days=self[1] + int(other[1]),
-                        seconds=self[2] + int(other[2]), subseconds=nano_add(self[3], other[3]))
+        if isinstance(other, Duration):
+            return Duration(months=self[0] + int(other[0]), days=self[1] + int(other[1]),
+                            seconds=self[2] + int(other[2]), subseconds=nano_add(self[3], other[3]))
+        if isinstance(other, timedelta):
+            return Duration(months=self[0], days=self[1] + int(other.days),
+                            seconds=self[2] + int(other.seconds),
+                            subseconds=nano_add(self[3], other.microseconds / 1000000))
+        return NotImplemented
 
     def __sub__(self, other):
-        if not isinstance(other, Duration):
-            return NotImplemented
-        return Duration(months=self[0] - int(other[0]), days=self[1] - int(other[1]),
-                        seconds=self[2] - int(other[2]), subseconds=nano_sub(self[3], other[3]))
+        if isinstance(other, Duration):
+            return Duration(months=self[0] - int(other[0]), days=self[1] - int(other[1]),
+                            seconds=self[2] - int(other[2]), subseconds=nano_sub(self[3], other[3]))
+        if isinstance(other, timedelta):
+            return Duration(months=self[0], days=self[1] - int(other.days),
+                            seconds=self[2] - int(other.seconds),
+                            subseconds=nano_sub(self[3], other.microseconds / 1000000))
+        return NotImplemented
 
     def __mul__(self, other):
-        if not isinstance(other, (int, float)):
-            return NotImplemented
-        return Duration(months=self[0] * other, days=self[1] * other,
-                        seconds=self[2] * other, subseconds=nano_mul(self[3], other))
+        if isinstance(other, (int, float)):
+            return Duration(months=self[0] * other, days=self[1] * other,
+                            seconds=self[2] * other, subseconds=nano_mul(self[3], other))
+        return NotImplemented
 
     def __floordiv__(self, other):
-        if not isinstance(other, int):
-            return NotImplemented
-        return Duration(months=int(self[0] // other), days=int(self[1] // other),
-                        seconds=int(nano_add(self[2], self[3]) // other), subseconds=0)
+        if isinstance(other, int):
+            return Duration(months=int(self[0] // other), days=int(self[1] // other),
+                            seconds=int(nano_add(self[2], self[3]) // other), subseconds=0)
+        return NotImplemented
 
     def __mod__(self, other):
-        if not isinstance(other, int):
-            return NotImplemented
-        seconds, subseconds = symmetric_divmod(nano_add(self[2], self[3]) % other, 1)
-        return Duration(months=round_half_to_even(self[0] % other), days=round_half_to_even(self[1] % other),
-                        seconds=seconds, subseconds=subseconds)
+        if isinstance(other, int):
+            seconds, subseconds = symmetric_divmod(nano_add(self[2], self[3]) % other, 1)
+            return Duration(months=round_half_to_even(self[0] % other), days=round_half_to_even(self[1] % other),
+                            seconds=seconds, subseconds=subseconds)
+        return NotImplemented
 
     def __divmod__(self, other):
-        if not isinstance(other, int):
-            return NotImplemented
-        return self.__floordiv__(other), self.__mod__(other)
+        if isinstance(other, int):
+            return self.__floordiv__(other), self.__mod__(other)
+        return NotImplemented
 
     def __truediv__(self, other):
-        if not isinstance(other, (int, float)):
-            return NotImplemented
-        return Duration(months=round_half_to_even(float(self[0]) / other), days=round_half_to_even(float(self[1]) / other),
-                        seconds=float(self[2]) / other, subseconds=nano_div(self[3], other))
+        if isinstance(other, (int, float)):
+            return Duration(months=round_half_to_even(float(self[0]) / other), days=round_half_to_even(float(self[1]) / other),
+                            seconds=float(self[2]) / other, subseconds=nano_div(self[3], other))
+        return NotImplemented
 
     __div__ = __truediv__
 
@@ -387,7 +395,7 @@ class Date(with_metaclass(DateType, object)):
         if tz is None:
             return cls.from_clock_time(Clock().local_time(), UnixEpoch)
         else:
-            return tz.fromutc(cls.from_clock_time(Clock().utc_time(), UnixEpoch).replace(tzinfo=tz))
+            return tz.fromutc(DateTime.from_clock_time(Clock().utc_time(), UnixEpoch).replace(tzinfo=tz)).date()
 
     @classmethod
     def utc_today(cls):
@@ -497,15 +505,11 @@ class Date(with_metaclass(DateType, object)):
 
     @classmethod
     def __calc_ordinal(cls, year, month, day):
-        if day >= 1:
-            ordinal = int(day)
-        else:
-            ordinal = cls.days_in_month(year, month) + int(day) + 1
-        for m in range(1, month):
-            ordinal += cls.days_in_month(year, m)
-        for y in range(1, year):
-            ordinal += cls.days_in_year(y)
-        return ordinal
+        if day < 0:
+            day = cls.days_in_month(year, month) + int(day) + 1
+        # The built-in date class does this faster than a
+        # long-hand pure Python algorithm could
+        return date(year, month, day).toordinal()
 
     @classmethod
     def __normalize_year(cls, year):
@@ -618,20 +622,20 @@ class Date(with_metaclass(DateType, object)):
 
         def iso_week_1(y):
             j4 = Date(y, 1, 4)
-            return j4 + Duration(days=(1 - day_of_week(j4.toordinal())))
+            return j4 + Duration(days=(1 - day_of_week(j4.to_ordinal())))
 
-        if ordinal >= Date(year, 12, 29).toordinal():
+        if ordinal >= Date(year, 12, 29).to_ordinal():
             week1 = iso_week_1(year + 1)
-            if ordinal < week1.toordinal():
+            if ordinal < week1.to_ordinal():
                 week1 = iso_week_1(year)
             else:
                 year += 1
         else:
             week1 = iso_week_1(year)
-            if ordinal < week1.toordinal():
+            if ordinal < week1.to_ordinal():
                 year -= 1
                 week1 = iso_week_1(year)
-        return year, int((ordinal - week1.toordinal()) / 7 + 1), day_of_week(ordinal)
+        return year, int((ordinal - week1.to_ordinal()) / 7 + 1), day_of_week(ordinal)
 
     @property
     def year_day(self):
@@ -655,21 +659,18 @@ class Date(with_metaclass(DateType, object)):
             return self.toordinal() < other.toordinal()
         return NotImplemented
 
-    def __int__(self):
-        return 10000 * self.year + 100 * self.month + self.day
-
     def __add__(self, other):
 
         def add_months(d, months):
             years, months = symmetric_divmod(months, 12)
             year = d.__year + years
             month = d.__month + months
-            if month > 12:
+            while month > 12:
                 year += 1
                 month -= 12
-            if month < 1:
+            while month < 1:
                 year -= 1
-                month -= 12
+                month += 12
             d.__year = year
             d.__month = month
 
@@ -720,40 +721,27 @@ class Date(with_metaclass(DateType, object)):
     def time_tuple(self):
         _, _, day_of_week = self.year_week_day
         _, day_of_year = self.year_day
-        return struct_time(
-            tm_year=self.year,
-            tm_mon=self.month,
-            tm_mday=self.day,
-            tm_hour=0,
-            tm_min=0,
-            tm_sec=0,
-            tm_wday=day_of_week - 1,
-            tm_yday=day_of_year,
-            tm_isdst=-1,
-        )
+        return struct_time((self.year, self.month, self.day, 0, 0, 0, day_of_week - 1, day_of_year, -1))
 
     def to_ordinal(self):
         """ Return the current value as an ordinal.
         """
         return self.__ordinal
 
-    def to_clock_time(self):
-        total_seconds = 0
-        for year in range(1, self.year):
-            total_seconds += 86400 * Date.days_in_year(year)
-        for month in range(1, self.month):
-            total_seconds += 86400 * Date.days_in_month(self.year, month)
-        total_seconds += 86400 * (self.day - 1)
-        return ClockTime(total_seconds)
+    def to_clock_time(self, epoch):
+        try:
+            return ClockTime(86400 * (self.to_ordinal() - epoch.to_ordinal()))
+        except AttributeError:
+            raise TypeError("Epoch has no ordinal value")
 
     def weekday(self):
-        raise NotImplementedError()
+        return self.year_week_day[2] - 1
 
     def iso_weekday(self):
-        raise NotImplementedError()
+        return self.year_week_day[2]
 
     def iso_calendar(self):
-        raise NotImplementedError()
+        return self.year_week_day
 
     def iso_format(self):
         if self.__ordinal == 0:
@@ -762,7 +750,7 @@ class Date(with_metaclass(DateType, object)):
 
     def __repr__(self):
         if self.__ordinal == 0:
-            return "neotime.ZERO_DATE"
+            return "neotime.ZeroDate"
         return "neotime.Date(%r, %r, %r)" % self.year_month_day
 
     def __str__(self):
