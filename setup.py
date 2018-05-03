@@ -29,6 +29,7 @@ from neotime import __version__
 
 install_requires = [
     "pytz",
+    "six",
 ]
 classifiers = [
     "Intended Audience :: Developers",
