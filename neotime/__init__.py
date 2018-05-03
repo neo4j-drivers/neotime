@@ -782,7 +782,6 @@ Date.resolution = Duration(days=1)
 ZeroDate = object.__new__(Date)
 
 
-@total_ordering
 class Time(with_metaclass(TimeType, object)):
     """ Time of day.
     """
@@ -810,6 +809,8 @@ class Time(with_metaclass(TimeType, object)):
         """
         try:
             return {
+                "isoformat": self.iso_format,
+                "utcoffset": self.utc_offset,
             }[name]
         except KeyError:
             raise AttributeError("Date has no attribute %r" % name)
@@ -821,7 +822,7 @@ class Time(with_metaclass(TimeType, object)):
         if tz is None:
             return cls.from_clock_time(Clock().local_time(), UnixEpoch)
         else:
-            return tz.fromutc(cls.from_clock_time(Clock().utc_time(), UnixEpoch).replace(tzinfo=tz))
+            return tz.fromutc(DateTime.from_clock_time(Clock().utc_time(), UnixEpoch)).time().replace(tzinfo=tz)
 
     @classmethod
     def utc_now(cls):
@@ -928,16 +929,41 @@ class Time(with_metaclass(TimeType, object)):
 
     def __lt__(self, other):
         if isinstance(other, Time):
-            if self.tzinfo == other.tzinfo:
-                return self.ticks < other.ticks
-            # TODO: compare across timezones?
-            return NotImplemented
+            return self.ticks < other.ticks
         if isinstance(other, time):
             other_ticks = 3600 * other.hour + 60 * other.minute + other.second + (other.microsecond / 1000000)
             return self.ticks < other_ticks
-        return False
+        raise TypeError("'<' not supported between instances of 'Time' and %r" % type(other).__name__)
+
+    def __le__(self, other):
+        if isinstance(other, Time):
+            return self.ticks <= other.ticks
+        if isinstance(other, time):
+            other_ticks = 3600 * other.hour + 60 * other.minute + other.second + (other.microsecond / 1000000)
+            return self.ticks <= other_ticks
+        raise TypeError("'<=' not supported between instances of 'Time' and %r" % type(other).__name__)
+
+    def __ge__(self, other):
+        if isinstance(other, Time):
+            return self.ticks >= other.ticks
+        if isinstance(other, time):
+            other_ticks = 3600 * other.hour + 60 * other.minute + other.second + (other.microsecond / 1000000)
+            return self.ticks >= other_ticks
+        raise TypeError("'>=' not supported between instances of 'Time' and %r" % type(other).__name__)
+
+    def __gt__(self, other):
+        if isinstance(other, Time):
+            return self.ticks >= other.ticks
+        if isinstance(other, time):
+            other_ticks = 3600 * other.hour + 60 * other.minute + other.second + (other.microsecond / 1000000)
+            return self.ticks >= other_ticks
+        raise TypeError("'>' not supported between instances of 'Time' and %r" % type(other).__name__)
 
     def __add__(self, other):
+        if isinstance(other, Duration):
+            return NotImplemented
+        if isinstance(other, timedelta):
+            return NotImplemented
         return NotImplemented
 
     def __sub__(self, other):
@@ -1190,7 +1216,31 @@ class DateTime(with_metaclass(DateTimeType, object)):
                 return self.time() < other.time()
             else:
                 return self.date() < other.date()
-        return NotImplemented
+        raise TypeError("'<' not supported between instances of 'DateTime' and %r" % type(other).__name__)
+
+    def __le__(self, other):
+        if isinstance(other, (DateTime, datetime)):
+            if self.date() == other.date():
+                return self.time() <= other.time()
+            else:
+                return self.date() < other.date()
+        raise TypeError("'<=' not supported between instances of 'DateTime' and %r" % type(other).__name__)
+
+    def __ge__(self, other):
+        if isinstance(other, (DateTime, datetime)):
+            if self.date() == other.date():
+                return self.time() >= other.time()
+            else:
+                return self.date() > other.date()
+        raise TypeError("'>=' not supported between instances of 'DateTime' and %r" % type(other).__name__)
+
+    def __gt__(self, other):
+        if isinstance(other, (DateTime, datetime)):
+            if self.date() == other.date():
+                return self.time() > other.time()
+            else:
+                return self.date() > other.date()
+        raise TypeError("'>' not supported between instances of 'DateTime' and %r" % type(other).__name__)
 
     def __add__(self, other):
         if isinstance(other, timedelta):

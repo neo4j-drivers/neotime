@@ -18,10 +18,20 @@
 
 from unittest import TestCase
 
+from pytz import timezone
+
 from neotime import Time
 
 
+eastern = timezone("US/Eastern")
+
+
 class TimeTestCase(TestCase):
+
+    def test_bad_attribute(self):
+        t = Time(12, 34, 56.789)
+        with self.assertRaises(AttributeError):
+            _ = t.x
 
     def test_simple_time(self):
         t = Time(12, 34, 56.789)
@@ -46,3 +56,20 @@ class TimeTestCase(TestCase):
         self.assertEqual(t.hour, 12)
         self.assertEqual(t.minute, 34)
         self.assertEqual(t.second, 56.789123456)
+
+    def test_str(self):
+        t = Time(12, 34, 56.789123456)
+        self.assertEqual(str(t), "12:34:56.789123456")
+
+    def test_now_without_tz(self):
+        t = Time.now()
+        self.assertIsInstance(t, Time)
+
+    def test_now_with_tz(self):
+        t = Time.now(tz=eastern)
+        self.assertIsInstance(t, Time)
+        self.assertEqual(t.tzinfo, eastern)
+
+    def test_utc_now(self):
+        t = Time.utc_now()
+        self.assertIsInstance(t, Time)
