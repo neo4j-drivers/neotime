@@ -33,7 +33,7 @@ from neotime.arithmetic import (nano_add, nano_sub, nano_mul, nano_div, nano_mod
 from neotime.metaclasses import DateType, TimeType, DateTimeType
 
 
-__version__ = "1.0.0rc2"
+__version__ = "1.0.0rc3"
 
 
 MIN_INT64 = -(2 ** 63)
@@ -468,6 +468,10 @@ class Date(with_metaclass(DateType, object)):
             raise ValueError("Date string must be in format YYYY-MM-DD")
 
     @classmethod
+    def from_native(cls, d):
+        return Date.from_ordinal(d.toordinal())
+
+    @classmethod
     def from_clock_time(cls, clock_time, epoch):
         """ Convert from a ClockTime relative to a given epoch.
         """
@@ -837,6 +841,11 @@ class Time(with_metaclass(TimeType, object)):
         raise ValueError("Ticks out of range (0..86400)")
 
     @classmethod
+    def from_native(cls, t):
+        second = (1000000 * t.second + t.microsecond) / 1000000
+        return Time(t.hour, t.minute, second, t.tzinfo)
+
+    @classmethod
     def from_clock_time(cls, clock_time, epoch):
         """ Convert from a ClockTime relative to a given epoch.
         """
@@ -1127,6 +1136,10 @@ class DateTime(with_metaclass(DateTimeType, object)):
     @classmethod
     def parse(cls, date_string, format):
         raise NotImplementedError()
+
+    @classmethod
+    def from_native(cls, dt):
+        return cls.combine(Date.from_native(dt.date()), Time.from_native(dt.time()))
 
     @classmethod
     def from_clock_time(cls, clock_time, epoch):

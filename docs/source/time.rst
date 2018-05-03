@@ -24,6 +24,8 @@ Constructors and other class methods
 
 .. py:classmethod:: Time.from_ticks(ticks)
 
+.. py:classmethod:: Time.from_native(time)
+
 .. py:classmethod:: Time.from_clock_time(t, epoch)
 
 

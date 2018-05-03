@@ -32,6 +32,8 @@ Constructors and other class methods
 
 .. py:classmethod:: DateTime.parse(timestamp, tz=None)
 
+.. py:classmethod:: DateTime.from_native(datetime)
+
 .. py:classmethod:: DateTime.from_clock_time(t, epoch)
 
 
