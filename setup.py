@@ -24,8 +24,6 @@ try:
 except ImportError:
     from distutils.core import setup, Extension
 
-from neotime import __version__
-
 
 install_requires = [
     "pytz",
@@ -47,7 +45,7 @@ packages = [
 ]
 setup_args = {
     "name": "neotime",
-    "version": __version__,
+    "version": "1.0.0rc5",
     "description": "High resolution temporal types",
     "license": "Apache License, Version 2.0",
     "long_description": open(path_join(dirname(__file__), "README.rst")).read(),
