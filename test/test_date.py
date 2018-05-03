@@ -399,10 +399,35 @@ class DateTestCase(TestCase):
         with self.assertRaises(TypeError):
             _ = d < object()
 
+    def test_date_less_than_or_equal_to(self):
+        new_year = Date(2000, 1, 1)
+        christmas = Date(1999, 12, 25)
+        self.assertLessEqual(christmas, new_year)
+
+    def test_date_less_than_or_equal_to_object(self):
+        d = Date(2000, 1, 1)
+        with self.assertRaises(TypeError):
+            _ = d <= object()
+
+    def test_date_greater_than_or_equal_to(self):
+        new_year = Date(2000, 1, 1)
+        christmas = Date(1999, 12, 25)
+        self.assertGreaterEqual(new_year, christmas)
+
+    def test_date_greater_than_or_equal_to_object(self):
+        d = Date(2000, 1, 1)
+        with self.assertRaises(TypeError):
+            _ = d >= object()
+
     def test_date_greater_than(self):
         new_year = Date(2000, 1, 1)
         christmas = Date(1999, 12, 25)
         self.assertGreater(new_year, christmas)
+
+    def test_date_greater_than_object(self):
+        d = Date(2000, 1, 1)
+        with self.assertRaises(TypeError):
+            _ = d > object()
 
     def test_date_equal(self):
         d1 = Date(2000, 1, 1)
