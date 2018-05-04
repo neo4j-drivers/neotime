@@ -33,7 +33,7 @@ from neotime.arithmetic import (nano_add, nano_sub, nano_mul, nano_div, nano_mod
 from neotime.metaclasses import DateType, TimeType, DateTimeType
 
 
-__version__ = "1.0.0rc5"
+__version__ = "1.0.0"
 
 
 MIN_INT64 = -(2 ** 63)

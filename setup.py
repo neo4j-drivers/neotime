@@ -45,8 +45,8 @@ packages = [
 ]
 setup_args = {
     "name": "neotime",
-    "version": "1.0.0rc5",
-    "description": "High resolution temporal types",
+    "version": "1.0.0",
+    "description": "Nanosecond resolution temporal types",
     "license": "Apache License, Version 2.0",
     "long_description": open(path_join(dirname(__file__), "README.rst")).read(),
     "author": "Nigel Small",
