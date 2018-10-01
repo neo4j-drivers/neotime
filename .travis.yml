@@ -16,4 +16,4 @@ install:
   - pip install --upgrade pytest coverage
 
 script:
-  - coverage run --source neotime -m pytest -v && coverage report --show-missing
+  - coverage run --source neotime -m pytest -v --doctest-modules && coverage report --show-missing
