@@ -26,14 +26,15 @@ from datetime import timedelta, date, time, datetime
 from functools import total_ordering
 from time import gmtime, mktime, struct_time
 
-from six import with_metaclass
+try:
+    from six import with_metaclass
+except ImportError:
+    def with_metaclass(*_):
+        return object
 
 from neotime.arithmetic import (nano_add, nano_sub, nano_mul, nano_div, nano_mod, nano_divmod,
                                 symmetric_divmod, round_half_to_even)
 from neotime.metaclasses import DateType, TimeType, DateTimeType
-
-
-__version__ = "1.0.0"
 
 
 MIN_INT64 = -(2 ** 63)

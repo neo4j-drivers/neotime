@@ -24,6 +24,8 @@ try:
 except ImportError:
     from distutils.core import setup, Extension
 
+from neotime.meta import package, version
+
 
 install_requires = [
     "pytz",
@@ -44,14 +46,14 @@ packages = [
     "neotime",
 ]
 setup_args = {
-    "name": "neotime",
-    "version": "1.0.0",
+    "name": package,
+    "version": version,
     "description": "Nanosecond resolution temporal types",
     "license": "Apache License, Version 2.0",
     "long_description": open(path_join(dirname(__file__), "README.rst")).read(),
     "author": "Nigel Small",
     "author_email": "nigel@neo4j.com",
-    "url": "http://neotime.readthedocs.io",
+    "url": "https://neotime.readthedocs.io",
     "install_requires": install_requires,
     "classifiers": classifiers,
     "packages": packages,
