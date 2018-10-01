@@ -857,7 +857,7 @@ class Time(with_metaclass(TimeType, object)):
 
     @classmethod
     def from_clock_time(cls, clock_time, epoch):
-        """ Convert from a ClockTime relative to a given epoch.
+        """ Convert from a `.ClockTime` relative to a given epoch.
         """
         clock_time = ClockTime(*clock_time)
         ts = clock_time.seconds % 86400

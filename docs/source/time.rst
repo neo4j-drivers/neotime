@@ -94,6 +94,13 @@ Instance methods
 
 .. method:: t.tzname()
 
+.. method:: t.to_clock_time()
+
+.. method:: t.to_native()
+
+    Convert to a native Python :class:`datetime.time` value.
+    Note that this conversion is potentially lossy, reducing subsecond precision from nanoseconds to microseconds.
+
 .. method:: t.iso_format()
 
 .. method:: t.__repr__()

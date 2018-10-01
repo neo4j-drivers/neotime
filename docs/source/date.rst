@@ -111,6 +111,8 @@ Instance methods
 
 .. method:: d.to_ordinal()
 
+.. method:: d.to_native()
+
 .. method:: d.weekday()
 
 .. method:: d.iso_weekday()

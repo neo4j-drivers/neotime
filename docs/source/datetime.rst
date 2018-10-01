@@ -126,6 +126,11 @@ Instance methods
 
 .. method:: dt.to_ordinal()
 
+.. method:: dt.to_native()
+
+    Convert to a native Python :class:`datetime.datetime` value.
+    Note that this conversion is potentially lossy, reducing subsecond precision from nanoseconds to microseconds.
+
 .. method:: dt.weekday()
 
 .. method:: dt.iso_weekday()

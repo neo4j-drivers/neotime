@@ -12,9 +12,10 @@ Overview
 
 The classes are listed below:
 
-* `Duration <http://neotime.readthedocs.io/en/latest/duration.html>`_
-* `Date <http://neotime.readthedocs.io/en/latest/date.html>`_
-* `Time <http://neotime.readthedocs.io/en/latest/time.html>`_
+* `Duration <https://neotime.readthedocs.io/en/latest/duration.html>`_
+* `Date <https://neotime.readthedocs.io/en/latest/date.html>`_
+* `Time <https://neotime.readthedocs.io/en/latest/time.html>`_
+* `DateTime <https://neotime.readthedocs.io/en/latest/datetime.html>`_
 * TODO
 
 
@@ -41,4 +42,4 @@ Your mileage may vary.
 More Information
 ================
 
-For more information, read the `docs <http://neotime.readthedocs.io/>`_.
+For more information, read the `docs <https://neotime.readthedocs.io/>`_.

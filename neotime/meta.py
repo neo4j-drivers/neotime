@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- encoding: utf-8 -*-
+# coding: utf-8
 
 # Copyright (c) 2002-2018 "Neo4j,"
 # Neo4j Sweden AB [http://neo4j.com]

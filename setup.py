@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# Copyright 2018, Nigel Small & Neo4j Sweden AB
+# Copyright (c) 2002-2018 "Neo4j,"
+# Neo4j Sweden AB [http://neo4j.com]
+#
+# This file is part of Neo4j.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -51,8 +54,8 @@ setup_args = {
     "description": "Nanosecond resolution temporal types",
     "license": "Apache License, Version 2.0",
     "long_description": open(path_join(dirname(__file__), "README.rst")).read(),
-    "author": "Nigel Small",
-    "author_email": "nigel@neo4j.com",
+    "author": "Neo4j Drivers Team",
+    "author_email": "drivers@neo4j.com",
     "url": "https://neotime.readthedocs.io",
     "install_requires": install_requires,
     "classifiers": classifiers,

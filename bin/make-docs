@@ -3,6 +3,7 @@
 ROOT=$(dirname $0)/..
 DOCS=${ROOT}/docs
 
+pip install --upgrade pip
 pip install --upgrade sphinx
 make -C ${DOCS} html
 

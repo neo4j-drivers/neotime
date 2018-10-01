@@ -15,18 +15,19 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join('..', '..')))
+from neotime.meta import version as neotime_version
 
 
 # -- Project information -----------------------------------------------------
 
 project = 'Neotime'
-copyright = '2018, Nigel Small & Neo4j Sweden AB'
-author = 'Nigel Small'
+copyright = '2018, Neo4j Sweden AB'
+author = 'Neo4j Drivers Team'
 
 # The short X.Y version
-version = '1.0'
+version = ".".join(neotime_version.replace("-", ".").split(".")[:2])
 # The full version, including alpha/beta/rc tags
-release = '1.0.0'
+release = neotime_version
 
 
 # -- General configuration ---------------------------------------------------
@@ -78,7 +79,7 @@ pygments_style = 'sphinx'
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'python_docs_theme'
+html_theme = 'sphinx_rtd_theme'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
