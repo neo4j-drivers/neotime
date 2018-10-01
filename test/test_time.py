@@ -16,11 +16,15 @@
 # limitations under the License.
 
 
+from __future__ import division
+
+from datetime import time
 from unittest import TestCase
 
 from pytz import timezone
 
 from neotime import Time
+from neotime.arithmetic import nano_add, nano_div
 
 
 eastern = timezone("US/Eastern")
@@ -73,3 +77,17 @@ class TimeTestCase(TestCase):
     def test_utc_now(self):
         t = Time.utc_now()
         self.assertIsInstance(t, Time)
+
+    def test_from_native(self):
+        native = time(12, 34, 56, 789123)
+        t = Time.from_native(native)
+        self.assertEqual(t.hour, native.hour)
+        self.assertEqual(t.minute, native.minute)
+        self.assertEqual(t.second, nano_add(native.second, nano_div(native.microsecond, 1000000)))
+
+    def test_to_native(self):
+        t = Time(12, 34, 56.789123456)
+        native = t.to_native()
+        self.assertEqual(t.hour, native.hour)
+        self.assertEqual(t.minute, native.minute)
+        self.assertEqual(56.789123, nano_add(native.second, nano_div(native.microsecond, 1000000)))

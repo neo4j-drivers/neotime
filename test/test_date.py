@@ -478,3 +478,17 @@ class DateTestCase(TestCase):
         d = Date(2018, 4, 30)
         with self.assertRaises(NotImplementedError):
             _ = d.__format__("")
+
+    def test_from_native(self):
+        native = date(2018, 10, 1)
+        d = Date.from_native(native)
+        self.assertEqual(d.year, native.year)
+        self.assertEqual(d.month, native.month)
+        self.assertEqual(d.day, native.day)
+
+    def test_to_native(self):
+        d = Date(2018, 10, 1)
+        native = d.to_native()
+        self.assertEqual(d.year, native.year)
+        self.assertEqual(d.month, native.month)
+        self.assertEqual(d.day, native.day)

@@ -22,6 +22,7 @@ from unittest import TestCase
 import pytz
 
 from neotime import DateTime, MIN_YEAR, MAX_YEAR, Duration
+from neotime.arithmetic import nano_add, nano_div
 from neotime.clock_implementations import Clock, ClockTime
 
 
@@ -219,3 +220,23 @@ class DateTimeTestCase(TestCase):
         ldt1 = eastern.localize(datetime(2018, 4, 27, 23, 0, 17))
         ldt2 = eastern.localize(DateTime(2018, 4, 27, 23, 0, 17))
         self.assertEqual(ldt1, ldt2)
+
+    def test_from_native(self):
+        native = datetime(2018, 10, 1, 12, 34, 56, 789123)
+        dt = DateTime.from_native(native)
+        self.assertEqual(dt.year, native.year)
+        self.assertEqual(dt.month, native.month)
+        self.assertEqual(dt.day, native.day)
+        self.assertEqual(dt.hour, native.hour)
+        self.assertEqual(dt.minute, native.minute)
+        self.assertEqual(dt.second, nano_add(native.second, nano_div(native.microsecond, 1000000)))
+
+    def test_to_native(self):
+        dt = DateTime(2018, 10, 1, 12, 34, 56.789123456)
+        native = dt.to_native()
+        self.assertEqual(dt.year, native.year)
+        self.assertEqual(dt.month, native.month)
+        self.assertEqual(dt.day, native.day)
+        self.assertEqual(dt.hour, native.hour)
+        self.assertEqual(dt.minute, native.minute)
+        self.assertEqual(56.789123, nano_add(native.second, nano_div(native.microsecond, 1000000)))

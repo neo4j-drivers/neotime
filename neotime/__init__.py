@@ -107,9 +107,9 @@ class Clock(object):
     precision clock implementation available.
 
         >>> clock = Clock()
-        >>> type(clock)
+        >>> type(clock)                                         # doctest: +SKIP
         neotime.clock_implementations.LibCClock
-        >>> clock.local_time()
+    >>> clock.local_time()                                      # doctest: +SKIP
         ClockTime(seconds=1525265942, nanoseconds=506844026)
 
     """
@@ -470,6 +470,8 @@ class Date(with_metaclass(DateType, object)):
 
     @classmethod
     def from_native(cls, d):
+        """ Convert from a native Python `datetime.date` value.
+        """
         return Date.from_ordinal(d.toordinal())
 
     @classmethod
@@ -753,6 +755,11 @@ class Date(with_metaclass(DateType, object)):
         except AttributeError:
             raise TypeError("Epoch has no ordinal value")
 
+    def to_native(self):
+        """ Convert to a native Python `datetime.date` value.
+        """
+        return date.fromordinal(self.to_ordinal())
+
     def weekday(self):
         return self.year_week_day[2] - 1
 
@@ -843,6 +850,8 @@ class Time(with_metaclass(TimeType, object)):
 
     @classmethod
     def from_native(cls, t):
+        """ Convert from a native Python `datetime.time` value.
+        """
         second = (1000000 * t.second + t.microsecond) / 1000000
         return Time(t.hour, t.minute, second, t.tzinfo)
 
@@ -1028,6 +1037,14 @@ class Time(with_metaclass(TimeType, object)):
         seconds, nanoseconds = nano_divmod(self.ticks, 1)
         return ClockTime(seconds, 1000000000 * nanoseconds)
 
+    def to_native(self):
+        """ Convert to a native Python `datetime.time` value.
+        """
+        h, m, s = self.hour_minute_second
+        s, ns = nano_divmod(s, 1)
+        ms = int(nano_mul(ns, 1000000))
+        return time(h, m, s, ms)
+
     def iso_format(self):
         if self.tzinfo is None:
             return "%02d:%02d:%012.9f" % self.hour_minute_second
@@ -1140,6 +1157,8 @@ class DateTime(with_metaclass(DateTimeType, object)):
 
     @classmethod
     def from_native(cls, dt):
+        """ Convert from a native Python `datetime.datetime` value.
+        """
         return cls.combine(Date.from_native(dt.date()), Time.from_native(dt.time()))
 
     @classmethod
@@ -1332,6 +1351,15 @@ class DateTime(with_metaclass(DateTimeType, object)):
         total_seconds += 86400 * (self.day - 1)
         seconds, nanoseconds = nano_divmod(self.__time.ticks, 1)
         return ClockTime(total_seconds + seconds, 1000000000 * nanoseconds)
+
+    def to_native(self):
+        """ Convert to a native Python `datetime.datetime` value.
+        """
+        y, mo, d = self.year_month_day
+        h, m, s = self.hour_minute_second
+        s, ns = nano_divmod(s, 1)
+        ms = int(nano_mul(ns, 1000000))
+        return datetime(y, mo, d, h, m, s, ms)
 
     def weekday(self):
         return self.__date.weekday()
