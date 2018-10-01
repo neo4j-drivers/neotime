@@ -1,2 +1,3 @@
+include LICENSE.txt
 global-exclude *.class *.pyc *.pyo *.so *.dll __pycache__
 prune test
