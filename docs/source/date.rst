@@ -115,7 +115,7 @@ Instance methods
 
 .. method:: d.iso_weekday()
 
-.. method:: dt.iso_calendar()
+.. method:: d.iso_calendar()
 
 .. method:: d.iso_format()
 
