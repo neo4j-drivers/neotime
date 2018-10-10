@@ -54,6 +54,34 @@ class DateTestCase(TestCase):
         self.assertEqual(d.day, 0)
         self.assertIs(d, ZeroDate)
 
+    def test_ordinal_at_start_of_1970(self):
+        d = Date.from_ordinal(719163)
+        self.assertEqual(d.year_month_day, (1970, 1, 1))
+        self.assertEqual(d.year, 1970)
+        self.assertEqual(d.month, 1)
+        self.assertEqual(d.day, 1)
+
+    def test_ordinal_at_end_of_1969(self):
+        d = Date.from_ordinal(719162)
+        self.assertEqual(d.year_month_day, (1969, 12, 31))
+        self.assertEqual(d.year, 1969)
+        self.assertEqual(d.month, 12)
+        self.assertEqual(d.day, 31)
+
+    def test_ordinal_at_start_of_2018(self):
+        d = Date.from_ordinal(736695)
+        self.assertEqual(d.year_month_day, (2018, 1, 1))
+        self.assertEqual(d.year, 2018)
+        self.assertEqual(d.month, 1)
+        self.assertEqual(d.day, 1)
+
+    def test_ordinal_at_end_of_2017(self):
+        d = Date.from_ordinal(736694)
+        self.assertEqual(d.year_month_day, (2017, 12, 31))
+        self.assertEqual(d.year, 2017)
+        self.assertEqual(d.month, 12)
+        self.assertEqual(d.day, 31)
+
     def test_all_positive_days_of_month_for_31_day_month(self):
         for day in range(1, 32):
             t = Date(1976, 1, day)
