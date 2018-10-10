@@ -44,6 +44,90 @@ MIN_YEAR = 1
 MAX_YEAR = 9999
 
 
+def _is_leap_year(year):
+    if year % 4 != 0:
+        return False
+    if year % 100 != 0:
+        return True
+    return year % 400 == 0
+
+
+IS_LEAP_YEAR = {year: _is_leap_year(year) for year in range(MIN_YEAR, MAX_YEAR + 1)}
+
+
+def _days_in_year(year):
+    return 366 if IS_LEAP_YEAR[year] else 365
+
+
+DAYS_IN_YEAR = {year: _days_in_year(year) for year in range(MIN_YEAR, MAX_YEAR + 1)}
+
+
+def _days_in_month(year, month):
+    if month in (9, 4, 6, 11):
+        return 30
+    elif month != 2:
+        return 31
+    else:
+        return 29 if IS_LEAP_YEAR[year] else 28
+
+
+DAYS_IN_MONTH = {(year, month): _days_in_month(year, month)
+                 for year in range(MIN_YEAR, MAX_YEAR + 1) for month in range(1, 13)}
+
+
+def _normalize_day(year, month, day):
+    """ Coerce the day of the month to an internal value that may or
+    may not match the "public" value.
+
+    With the exception of the last three days of every month, all
+    days are stored as-is. The last three days are instead stored
+    as -1 (the last), -2 (first from last) and -3 (second from last).
+
+    Therefore, for a 28-day month, the last week is as follows:
+
+        Day   | 22 23 24 25 26 27 28
+        Value | 22 23 24 25 -3 -2 -1
+
+    For a 29-day month, the last week is as follows:
+
+        Day   | 23 24 25 26 27 28 29
+        Value | 23 24 25 26 -3 -2 -1
+
+    For a 30-day month, the last week is as follows:
+
+        Day   | 24 25 26 27 28 29 30
+        Value | 24 25 26 27 -3 -2 -1
+
+    For a 31-day month, the last week is as follows:
+
+        Day   | 25 26 27 28 29 30 31
+        Value | 25 26 27 28 -3 -2 -1
+
+    This slightly unintuitive system makes some temporal arithmetic
+    produce a more desirable outcome.
+
+    :param year:
+    :param month:
+    :param day:
+    :return:
+    """
+    if year < MIN_YEAR or year > MAX_YEAR:
+        raise ValueError("Year out of range (%d..%d)" % (MIN_YEAR, MAX_YEAR))
+    if month < 1 or month > 12:
+        raise ValueError("Month out of range (1..12)")
+    days_in_month = DAYS_IN_MONTH[(year, month)]
+    if day in (days_in_month, -1):
+        return year, month, -1
+    if day in (days_in_month - 1, -2):
+        return year, month, -2
+    if day in (days_in_month - 2, -3):
+        return year, month, -3
+    if 1 <= day <= days_in_month - 3:
+        return year, month, int(day)
+    # TODO improve this error message
+    raise ValueError("Day %d out of range (1..%d, -1, -2 ,-3)" % (day, days_in_month))
+
+
 class ClockTime(tuple):
     """ A count of `seconds` and `nanoseconds`. This class can be used to
     mark a particular point in time, relative to an externally-specified
@@ -359,7 +443,7 @@ class Date(with_metaclass(DateType, object)):
     def __new__(cls, year, month, day):
         if year == month == day == 0:
             return ZeroDate
-        year, month, day = cls.__normalize_day(year, month, day)
+        year, month, day = _normalize_day(year, month, day)
         ordinal = cls.__calc_ordinal(year, month, day)
         return cls.__new(ordinal, year, month, day)
 
@@ -423,8 +507,12 @@ class Date(with_metaclass(DateType, object)):
         """
         if ordinal == 0:
             return ZeroDate
-        if ordinal >= 719163:
-            year = 1970
+        if ordinal >= 736695:
+            year = 2018     # Project release year
+            month = 1
+            day = int(ordinal - 736694)
+        elif ordinal >= 719163:
+            year = 1970     # Unix epoch
             month = 1
             day = int(ordinal - 719162)
         else:
@@ -435,17 +523,19 @@ class Date(with_metaclass(DateType, object)):
             # Note: this requires a maximum of 22 bits for storage
             # Could be transferred in 3 bytes.
             raise ValueError("Ordinal out of range (1..3652059)")
-        days_in_year = cls.days_in_year(year)
+        if year < MIN_YEAR or year > MAX_YEAR:
+            raise ValueError("Year out of range (%d..%d)" % (MIN_YEAR, MAX_YEAR))
+        days_in_year = DAYS_IN_YEAR[year]
         while day > days_in_year:
             day -= days_in_year
             year += 1
-            days_in_year = cls.days_in_year(year)
-        days_in_month = cls.days_in_month(year, month)
+            days_in_year = DAYS_IN_YEAR[year]
+        days_in_month = DAYS_IN_MONTH[(year, month)]
         while day > days_in_month:
             day -= days_in_month
             month += 1
-            days_in_month = cls.days_in_month(year, month)
-        year, month, day = cls.__normalize_day(year, month, day)
+            days_in_month = DAYS_IN_MONTH[(year, month)]
+        year, month, day = _normalize_day(year, month, day)
         return cls.__new(ordinal, year, month, day)
 
     @classmethod
@@ -488,26 +578,23 @@ class Date(with_metaclass(DateType, object)):
 
     @classmethod
     def is_leap_year(cls, year):
-        year = cls.__normalize_year(year)
-        if year % 4 != 0:
-            return False
-        if year % 100 != 0:
-            return True
-        return year % 400 == 0
+        if year < MIN_YEAR or year > MAX_YEAR:
+            raise ValueError("Year out of range (%d..%d)" % (MIN_YEAR, MAX_YEAR))
+        return IS_LEAP_YEAR[year]
 
     @classmethod
     def days_in_year(cls, year):
-        return 366 if cls.is_leap_year(year) else 365
+        if year < MIN_YEAR or year > MAX_YEAR:
+            raise ValueError("Year out of range (%d..%d)" % (MIN_YEAR, MAX_YEAR))
+        return DAYS_IN_YEAR[year]
 
     @classmethod
     def days_in_month(cls, year, month):
-        year, month = cls.__normalize_month(year, month)
-        if month in (9, 4, 6, 11):
-            return 30
-        elif month != 2:
-            return 31
-        else:
-            return 29 if cls.is_leap_year(year) else 28
+        if year < MIN_YEAR or year > MAX_YEAR:
+            raise ValueError("Year out of range (%d..%d)" % (MIN_YEAR, MAX_YEAR))
+        if month < 1 or month > 12:
+            raise ValueError("Month out of range (1..12)")
+        return DAYS_IN_MONTH[(year, month)]
 
     @classmethod
     def __calc_ordinal(cls, year, month, day):
@@ -516,69 +603,6 @@ class Date(with_metaclass(DateType, object)):
         # The built-in date class does this faster than a
         # long-hand pure Python algorithm could
         return date(year, month, day).toordinal()
-
-    @classmethod
-    def __normalize_year(cls, year):
-        if MIN_YEAR <= year <= MAX_YEAR:
-            return int(year)
-        raise ValueError("Year out of range (%d..%d)" % (MIN_YEAR, MAX_YEAR))
-
-    @classmethod
-    def __normalize_month(cls, year, month):
-        year = cls.__normalize_year(year)
-        if 1 <= month <= 12:
-            return year, int(month)
-        raise ValueError("Month out of range (1..12)")
-
-    @classmethod
-    def __normalize_day(cls, year, month, day):
-        """ Coerce the day of the month to an internal value that may or
-        may not match the "public" value.
-
-        With the exception of the last three days of every month, all
-        days are stored as-is. The last three days are instead stored
-        as -1 (the last), -2 (first from last) and -3 (second from last).
-
-        Therefore, for a 28-day month, the last week is as follows:
-
-            Day   | 22 23 24 25 26 27 28
-            Value | 22 23 24 25 -3 -2 -1
-
-        For a 29-day month, the last week is as follows:
-
-            Day   | 23 24 25 26 27 28 29
-            Value | 23 24 25 26 -3 -2 -1
-
-        For a 30-day month, the last week is as follows:
-
-            Day   | 24 25 26 27 28 29 30
-            Value | 24 25 26 27 -3 -2 -1
-
-        For a 31-day month, the last week is as follows:
-
-            Day   | 25 26 27 28 29 30 31
-            Value | 25 26 27 28 -3 -2 -1
-
-        This slightly unintuitive system makes some temporal arithmetic
-        produce a more desirable outcome.
-
-        :param year:
-        :param month:
-        :param day:
-        :return:
-        """
-        year, month = cls.__normalize_month(year, month)
-        days_in_month = cls.days_in_month(year, month)
-        if day in (days_in_month, -1):
-            return year, month, -1
-        if day in (days_in_month - 1, -2):
-            return year, month, -2
-        if day in (days_in_month - 2, -3):
-            return year, month, -3
-        if 1 <= day <= days_in_month - 3:
-            return year, month, int(day)
-        # TODO improve this error message
-        raise ValueError("Day %d out of range (1..%d, -1, -2 ,-3)" % (day, days_in_month))
 
     # CLASS ATTRIBUTES #
 
@@ -1345,7 +1369,7 @@ class DateTime(with_metaclass(DateTimeType, object)):
     def to_clock_time(self):
         total_seconds = 0
         for year in range(1, self.year):
-            total_seconds += 86400 * Date.days_in_year(year)
+            total_seconds += 86400 * DAYS_IN_YEAR[year]
         for month in range(1, self.month):
             total_seconds += 86400 * Date.days_in_month(self.year, month)
         total_seconds += 86400 * (self.day - 1)
