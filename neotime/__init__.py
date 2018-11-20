@@ -1070,10 +1070,7 @@ class Time(with_metaclass(TimeType, object)):
         return time(h, m, s, ms)
 
     def iso_format(self):
-        if self.tzinfo is None:
-            return "%02d:%02d:%012.9f" % self.hour_minute_second
-        else:
-            raise NotImplementedError()
+        return "%02d:%02d:%012.9f" % self.hour_minute_second
 
     def __repr__(self):
         if self.tzinfo is None:
@@ -1395,7 +1392,11 @@ class DateTime(with_metaclass(DateTimeType, object)):
         return self.__date.iso_calendar()
 
     def iso_format(self, sep="T"):
-        return sep.join([self.date().iso_format(), self.time().iso_format()])
+        s = "%s%s%s" % (self.date().iso_format(), sep, self.time().iso_format())
+        if self.tzinfo is not None:
+            offset = self.tzinfo.utcoffset(self)
+            s += "%+03d:%02d" % divmod(offset.total_seconds() // 60, 60)
+        return s
 
     def __repr__(self):
         if self.tzinfo is None:
@@ -1410,6 +1411,7 @@ class DateTime(with_metaclass(DateTimeType, object)):
 
     def __format__(self, format_spec):
         raise NotImplementedError()
+
 
 DateTime.min = DateTime.combine(Date.min, Time.min)
 DateTime.max = DateTime.combine(Date.max, Time.max)

@@ -313,3 +313,14 @@ class DurationTestCase(TestCase):
     def test_repr(self):
         d = Duration(months=2, days=3, seconds=5.7)
         self.assertEqual(repr(d), "Duration(months=2, days=3, seconds=5, subseconds=0.7)")
+
+    def test_iso_format(self):
+        self.assertEqual(Duration().iso_format(), "PT0S")
+        self.assertEqual(Duration(years=1, months=2).iso_format(), "P1Y2M")
+        self.assertEqual(Duration(years=-1, months=2).iso_format(), "P-10M")
+        self.assertEqual(Duration(months=-13).iso_format(), "P-1Y-1M")
+        self.assertEqual(Duration(months=2, days=3, seconds=5.7).iso_format(), "P2M3DT5.7S")
+        self.assertEqual(Duration(hours=12, minutes=34).iso_format(), "PT12H34M")
+        self.assertEqual(Duration(seconds=59).iso_format(), "PT59S")
+        self.assertEqual(Duration(seconds=0.123456789).iso_format(), "PT0.123456789S")
+        self.assertEqual(Duration(seconds=-0.123456789).iso_format(), "PT-0.123456789S")

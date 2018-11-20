@@ -243,3 +243,19 @@ class DateTimeTestCase(TestCase):
         self.assertEqual(dt.hour, native.hour)
         self.assertEqual(dt.minute, native.minute)
         self.assertEqual(56.789123, nano_add(native.second, nano_div(native.microsecond, 1000000)))
+
+    def test_iso_format(self):
+        dt = DateTime(2018, 10, 1, 12, 34, 56.789123456)
+        self.assertEqual("2018-10-01T12:34:56.789123456", dt.iso_format())
+
+    def test_iso_format_with_trailing_zeroes(self):
+        dt = DateTime(2018, 10, 1, 12, 34, 56.789)
+        self.assertEqual("2018-10-01T12:34:56.789000000", dt.iso_format())
+
+    def test_iso_format_with_tz(self):
+        dt = eastern.localize(DateTime(2018, 10, 1, 12, 34, 56.789123456))
+        self.assertEqual("2018-10-01T12:34:56.789123456-04:00", dt.iso_format())
+
+    def test_iso_format_with_tz_and_trailing_zeroes(self):
+        dt = eastern.localize(DateTime(2018, 10, 1, 12, 34, 56.789))
+        self.assertEqual("2018-10-01T12:34:56.789000000-04:00", dt.iso_format())

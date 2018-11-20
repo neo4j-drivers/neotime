@@ -523,3 +523,7 @@ class DateTestCase(TestCase):
         self.assertEqual(d.year, native.year)
         self.assertEqual(d.month, native.month)
         self.assertEqual(d.day, native.day)
+
+    def test_iso_format(self):
+        d = Date(2018, 10, 1)
+        self.assertEqual("2018-10-01", d.iso_format())

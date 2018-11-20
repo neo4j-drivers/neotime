@@ -94,3 +94,11 @@ class TimeTestCase(TestCase):
         self.assertEqual(t.hour, native.hour)
         self.assertEqual(t.minute, native.minute)
         self.assertEqual(56.789123, nano_add(native.second, nano_div(native.microsecond, 1000000)))
+
+    def test_iso_format(self):
+        t = Time(12, 34, 56.789123456)
+        self.assertEqual("12:34:56.789123456", t.iso_format())
+
+    def test_iso_format_with_trailing_zeroes(self):
+        t = Time(12, 34, 56.789)
+        self.assertEqual("12:34:56.789000000", t.iso_format())
