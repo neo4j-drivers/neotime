@@ -24,7 +24,7 @@ from __future__ import division
 from datetime import time
 from unittest import TestCase
 
-from pytz import timezone
+from pytz import timezone, FixedOffset
 
 from neotime import Time
 from neotime.arithmetic import nano_add, nano_div
@@ -102,3 +102,53 @@ class TimeTestCase(TestCase):
     def test_iso_format_with_trailing_zeroes(self):
         t = Time(12, 34, 56.789)
         self.assertEqual("12:34:56.789000000", t.iso_format())
+
+    def test_from_iso_format_hour_only(self):
+        expected = Time(12, 0, 0)
+        actual = Time.from_iso_format("12")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_hour_and_minute(self):
+        expected = Time(12, 34, 0)
+        actual = Time.from_iso_format("12:34")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_hour_minute_second(self):
+        expected = Time(12, 34, 56)
+        actual = Time.from_iso_format("12:34:56")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_hour_minute_second_milliseconds(self):
+        expected = Time(12, 34, 56.123)
+        actual = Time.from_iso_format("12:34:56.123")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_hour_minute_second_microseconds(self):
+        expected = Time(12, 34, 56.123456)
+        actual = Time.from_iso_format("12:34:56.123456")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_hour_minute_second_nanoseconds(self):
+        expected = Time(12, 34, 56.123456789)
+        actual = Time.from_iso_format("12:34:56.123456789")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_with_positive_tz(self):
+        expected = Time(12, 34, 56.123456789, tzinfo=FixedOffset(754))
+        actual = Time.from_iso_format("12:34:56.123456789+12:34")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_with_negative_tz(self):
+        expected = Time(12, 34, 56.123456789, tzinfo=FixedOffset(-754))
+        actual = Time.from_iso_format("12:34:56.123456789-12:34")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_with_positive_long_tz(self):
+        expected = Time(12, 34, 56.123456789, tzinfo=FixedOffset(754))
+        actual = Time.from_iso_format("12:34:56.123456789+12:34:56.123456")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_with_negative_long_tz(self):
+        expected = Time(12, 34, 56.123456789, tzinfo=FixedOffset(-754))
+        actual = Time.from_iso_format("12:34:56.123456789-12:34:56.123456")
+        self.assertEqual(expected, actual)

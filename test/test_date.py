@@ -527,3 +527,8 @@ class DateTestCase(TestCase):
     def test_iso_format(self):
         d = Date(2018, 10, 1)
         self.assertEqual("2018-10-01", d.iso_format())
+
+    def test_from_iso_format(self):
+        expected = Date(2018, 10, 1)
+        actual = Date.from_iso_format("2018-10-01")
+        self.assertEqual(expected, actual)

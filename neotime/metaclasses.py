@@ -24,6 +24,7 @@ class DateType(type):
     def __getattr__(cls, name):
         try:
             return {
+                "fromisoformat": cls.from_iso_format,
                 "fromordinal": cls.from_ordinal,
                 "fromtimestamp": cls.from_timestamp,
                 "utcfromtimestamp": cls.utc_from_timestamp,
@@ -37,6 +38,7 @@ class TimeType(type):
     def __getattr__(cls, name):
         try:
             return {
+                "fromisoformat": cls.from_iso_format,
                 "utcnow": cls.utc_now,
             }[name]
         except KeyError:
@@ -48,6 +50,7 @@ class DateTimeType(type):
     def __getattr__(cls, name):
         try:
             return {
+                "fromisoformat": cls.from_iso_format,
                 "fromordinal": cls.from_ordinal,
                 "fromtimestamp": cls.from_timestamp,
                 "strptime": cls.parse,

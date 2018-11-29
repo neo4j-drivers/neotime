@@ -22,14 +22,14 @@
 from datetime import datetime, timedelta
 from unittest import TestCase
 
-import pytz
+from pytz import timezone, FixedOffset
 
 from neotime import DateTime, MIN_YEAR, MAX_YEAR, Duration
 from neotime.arithmetic import nano_add, nano_div
 from neotime.clock_implementations import Clock, ClockTime
 
 
-eastern = pytz.timezone("US/Eastern")
+eastern = timezone("US/Eastern")
 
 
 class FixedClock(Clock):
@@ -259,3 +259,53 @@ class DateTimeTestCase(TestCase):
     def test_iso_format_with_tz_and_trailing_zeroes(self):
         dt = eastern.localize(DateTime(2018, 10, 1, 12, 34, 56.789))
         self.assertEqual("2018-10-01T12:34:56.789000000-04:00", dt.iso_format())
+
+    def test_from_iso_format_hour_only(self):
+        expected = DateTime(2018, 10, 1, 12, 0, 0)
+        actual = DateTime.from_iso_format("2018-10-01T12")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_hour_and_minute(self):
+        expected = DateTime(2018, 10, 1, 12, 34, 0)
+        actual = DateTime.from_iso_format("2018-10-01T12:34")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_hour_minute_second(self):
+        expected = DateTime(2018, 10, 1, 12, 34, 56)
+        actual = DateTime.from_iso_format("2018-10-01T12:34:56")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_hour_minute_second_milliseconds(self):
+        expected = DateTime(2018, 10, 1, 12, 34, 56.123)
+        actual = DateTime.from_iso_format("2018-10-01T12:34:56.123")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_hour_minute_second_microseconds(self):
+        expected = DateTime(2018, 10, 1, 12, 34, 56.123456)
+        actual = DateTime.from_iso_format("2018-10-01T12:34:56.123456")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_hour_minute_second_nanoseconds(self):
+        expected = DateTime(2018, 10, 1, 12, 34, 56.123456789)
+        actual = DateTime.from_iso_format("2018-10-01T12:34:56.123456789")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_with_positive_tz(self):
+        expected = DateTime(2018, 10, 1, 12, 34, 56.123456789, tzinfo=FixedOffset(754))
+        actual = DateTime.from_iso_format("2018-10-01T12:34:56.123456789+12:34")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_with_negative_tz(self):
+        expected = DateTime(2018, 10, 1, 12, 34, 56.123456789, tzinfo=FixedOffset(-754))
+        actual = DateTime.from_iso_format("2018-10-01T12:34:56.123456789-12:34")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_with_positive_long_tz(self):
+        expected = DateTime(2018, 10, 1, 12, 34, 56.123456789, tzinfo=FixedOffset(754))
+        actual = DateTime.from_iso_format("2018-10-01T12:34:56.123456789+12:34:56.123456")
+        self.assertEqual(expected, actual)
+
+    def test_from_iso_format_with_negative_long_tz(self):
+        expected = DateTime(2018, 10, 1, 12, 34, 56.123456789, tzinfo=FixedOffset(-754))
+        actual = DateTime.from_iso_format("2018-10-01T12:34:56.123456789-12:34:56.123456")
+        self.assertEqual(expected, actual)

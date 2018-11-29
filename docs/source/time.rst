@@ -22,6 +22,8 @@ Constructors and other class methods
 
 .. py:classmethod:: Time.utc_now()
 
+.. py:classmethod:: Time.from_iso_format(s)
+
 .. py:classmethod:: Time.from_ticks(ticks)
 
 .. py:classmethod:: Time.from_native(time)

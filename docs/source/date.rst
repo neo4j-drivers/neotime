@@ -50,6 +50,8 @@ Constructors and other class methods
 
 .. classmethod:: Date.parse(s)
 
+.. classmethod:: Date.from_iso_format(s)
+
 .. classmethod:: Date.from_native(date)
 
 .. classmethod:: Date.from_clock_time(cls, t, epoch):

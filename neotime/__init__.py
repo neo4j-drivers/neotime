@@ -24,7 +24,11 @@ from __future__ import division, print_function
 
 from datetime import timedelta, date, time, datetime
 from functools import total_ordering
+from re import compile as re_compile
 from time import gmtime, mktime, struct_time
+
+from pytz import FixedOffset
+
 
 try:
     from six import with_metaclass
@@ -42,6 +46,11 @@ MAX_INT64 = (2 ** 63) - 1
 
 MIN_YEAR = 1
 MAX_YEAR = 9999
+
+
+DATE_ISO_PATTERN = re_compile(r'^(\d{4})-(\d{2})-(\d{2})$')
+TIME_ISO_PATTERN = re_compile(r'^(\d{2})(:(\d{2})(:((\d{2})(\.\d*)?))?)?(([+-])(\d{2}):(\d{2})(:((\d{2})(\.\d*)?))?)?$')
+DURATION_ISO_PATTERN = re_compile(r'^P((\d+)Y)?((\d+)M)?((\d+)D)?(T((\d+)H)?((\d+)M)?((\d+(\.\d+)?)?S)?)?$')
 
 
 def _is_leap_year(year):
@@ -346,6 +355,22 @@ class Duration(tuple):
     def __str__(self):
         return self.iso_format()
 
+    @classmethod
+    def from_iso_format(cls, s):
+        m = DURATION_ISO_PATTERN.match(s)
+        if m:
+            return cls(
+                years=int(m.group(2) or 0),
+                months=int(m.group(4) or 0),
+                days=int(m.group(6) or 0),
+                hours=int(m.group(9) or 0),
+                minutes=int(m.group(11) or 0),
+                seconds=float(m.group(13) or 0.0),
+            )
+        raise ValueError("Duration string must be in ISO format")
+
+    fromisoformat = from_iso_format
+
     def iso_format(self, sep="T"):
         """
 
@@ -557,6 +582,16 @@ class Date(with_metaclass(DateType, object)):
             if len(numbers) == 3:
                 return cls(*numbers)
             raise ValueError("Date string must be in format YYYY-MM-DD")
+
+    @classmethod
+    def from_iso_format(cls, s):
+        m = DATE_ISO_PATTERN.match(s)
+        if m:
+            year = int(m.group(1))
+            month = int(m.group(2))
+            day = int(m.group(3))
+            return cls(year, month, day)
+        raise ValueError("Date string must be in format YYYY-MM-DD")
 
     @classmethod
     def from_native(cls, d):
@@ -865,6 +900,26 @@ class Time(with_metaclass(TimeType, object)):
         return cls.from_clock_time(Clock().utc_time(), UnixEpoch)
 
     @classmethod
+    def from_iso_format(cls, s):
+        m = TIME_ISO_PATTERN.match(s)
+        if m:
+            hour = int(m.group(1))
+            minute = int(m.group(3) or 0)
+            second = float(m.group(5) or 0.0)
+            if m.group(8) is None:
+                return cls(hour, minute, second)
+            else:
+                offset_multiplier = 1 if m.group(9) == "+" else -1
+                offset_hour = int(m.group(10))
+                offset_minute = int(m.group(11))
+                # pytz only supports offsets of minute resolution
+                # so we can ignore this part
+                # offset_second = float(m.group(13) or 0.0)
+                offset = 60 * offset_hour + offset_minute
+                return cls(hour, minute, second, tzinfo=FixedOffset(offset_multiplier * offset))
+        raise ValueError("Time string is not in ISO format")
+
+    @classmethod
     def from_ticks(cls, ticks, tz=None):
         if 0 <= ticks < 86400:
             minute, second = nano_divmod(ticks, 60)
@@ -1147,6 +1202,13 @@ class DateTime(with_metaclass(DateTimeType, object)):
     @classmethod
     def utc_now(cls):
         return cls.from_clock_time(Clock().utc_time(), UnixEpoch)
+
+    @classmethod
+    def from_iso_format(cls, s):
+        try:
+            return cls.combine(Date.from_iso_format(s[0:10]), Time.from_iso_format(s[11:]))
+        except ValueError:
+            raise ValueError("DateTime string is not in ISO format")
 
     @classmethod
     def from_timestamp(cls, timestamp, tz=None):

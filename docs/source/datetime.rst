@@ -22,6 +22,8 @@ Constructors and other class methods
 
 .. py:classmethod:: DateTime.utc_now()
 
+.. py:classmethod:: DateTime.from_iso_format(s)
+
 .. py:classmethod:: DateTime.from_timestamp(timestamp, tz=None)
 
 .. py:classmethod:: DateTime.utc_from_timestamp(timestamp)

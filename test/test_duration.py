@@ -324,3 +324,12 @@ class DurationTestCase(TestCase):
         self.assertEqual(Duration(seconds=59).iso_format(), "PT59S")
         self.assertEqual(Duration(seconds=0.123456789).iso_format(), "PT0.123456789S")
         self.assertEqual(Duration(seconds=-0.123456789).iso_format(), "PT-0.123456789S")
+
+    def test_from_iso_format(self):
+        self.assertEqual(Duration(), Duration.from_iso_format("PT0S"))
+        self.assertEqual(Duration(hours=12, minutes=34, seconds=56.789),
+                         Duration.from_iso_format("PT12H34M56.789S"))
+        self.assertEqual(Duration(years=1, months=2, days=3),
+                         Duration.from_iso_format("P1Y2M3D"))
+        self.assertEqual(Duration(years=1, months=2, days=3, hours=12, minutes=34, seconds=56.789),
+                         Duration.from_iso_format("P1Y2M3DT12H34M56.789S"))
