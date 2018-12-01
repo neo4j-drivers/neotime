@@ -27,7 +27,13 @@ from functools import total_ordering
 from re import compile as re_compile
 from time import gmtime, mktime, struct_time
 
-from pytz import FixedOffset
+##Just ensures that module can be imported on install, becuase offset is not needed when importing while install.
+##After the install it should work every time, cause pytz is installed with the packge.
+try:
+    from pytz import FixedOffset
+except:
+    def FixedOffset():
+        raise Exception("I seems like pytz is not installed or there is an error with your pytz installation. Please reinstall pytz.")
 
 
 try:
