@@ -33,7 +33,7 @@ try:
     from pytz import offset
 except:
     def offset():
-        pass
+        raise Exception("I seems like pytz is not installed or there is an error with your pytz installation. Please reinstall pytz.")
 
 
 try:
