@@ -10,6 +10,8 @@ python:
   - "3.7-dev"
   - "pypy"
   - "nightly"
+irtualenv:
+  system_site_packages: False
 
 install:
   - pip install --upgrade pip
