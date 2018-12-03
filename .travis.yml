@@ -15,7 +15,7 @@ virtualenv:
 
 install:
   - pip install --upgrade pip
-  - pip install --upgrade -r requirements.txt
+  - pip install --upgrade .
   - pip install --upgrade pytest coverage
 
 script:
