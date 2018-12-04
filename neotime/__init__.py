@@ -27,8 +27,6 @@ from functools import total_ordering
 from re import compile as re_compile
 from time import gmtime, mktime, struct_time
 
-from pytz import FixedOffset
-
 
 try:
     from six import with_metaclass
@@ -901,6 +899,7 @@ class Time(with_metaclass(TimeType, object)):
 
     @classmethod
     def from_iso_format(cls, s):
+        from pytz import FixedOffset
         m = TIME_ISO_PATTERN.match(s)
         if m:
             hour = int(m.group(1))
