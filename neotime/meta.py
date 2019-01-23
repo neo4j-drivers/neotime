@@ -21,4 +21,4 @@
 
 # Can be automatically overridden in builds
 package = "neotime"
-version = "1.7.dev0"
+version = "2.0.dev0"
