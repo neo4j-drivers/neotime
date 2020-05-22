@@ -1121,7 +1121,8 @@ class Time(with_metaclass(TimeType, object)):
         h, m, s = self.hour_minute_second
         s, ns = nano_divmod(s, 1)
         ms = int(nano_mul(ns, 1000000))
-        return time(h, m, s, ms)
+        tz = self.tzinfo
+        return time(h, m, s, ms, tz)
 
     def iso_format(self):
         return "%02d:%02d:%012.9f" % self.hour_minute_second
@@ -1441,7 +1442,8 @@ class DateTime(with_metaclass(DateTimeType, object)):
         h, m, s = self.hour_minute_second
         s, ns = nano_divmod(s, 1)
         ms = int(nano_mul(ns, 1000000))
-        return datetime(y, mo, d, h, m, s, ms)
+        tz = self.tzinfo
+        return datetime(y, mo, d, h, m, s, ms, tz)
 
     def weekday(self):
         return self.__date.weekday()
