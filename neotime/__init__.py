@@ -1126,10 +1126,15 @@ class Time(with_metaclass(TimeType, object)):
         h, m, s = self.hour_minute_second
         s, ns = nano_divmod(s, 1)
         ms = int(nano_mul(ns, 1000000))
-        return time(h, m, s, ms)
+        tz = self.tzinfo
+        return time(h, m, s, ms, tz)
 
     def iso_format(self):
-        return "%02d:%02d:%012.9f" % self.hour_minute_second
+        s = "%02d:%02d:%012.9f" % self.hour_minute_second
+        if self.tzinfo is not None:
+            offset = self.tzinfo.utcoffset(self)
+            s += "%+03d:%02d" % divmod(offset.total_seconds() // 60, 60)
+        return s
 
     def __repr__(self):
         if self.tzinfo is None:
@@ -1246,7 +1251,7 @@ class DateTime(with_metaclass(DateTimeType, object)):
     def from_native(cls, dt):
         """ Convert from a native Python `datetime.datetime` value.
         """
-        return cls.combine(Date.from_native(dt.date()), Time.from_native(dt.time()))
+        return cls.combine(Date.from_native(dt.date()), Time.from_native(dt.timetz()))
 
     @classmethod
     def from_clock_time(cls, clock_time, epoch):
@@ -1447,7 +1452,8 @@ class DateTime(with_metaclass(DateTimeType, object)):
         h, m, s = self.hour_minute_second
         s, ns = nano_divmod(s, 1)
         ms = int(nano_mul(ns, 1000000))
-        return datetime(y, mo, d, h, m, s, ms)
+        tz = self.tzinfo
+        return datetime(y, mo, d, h, m, s, ms, tz)
 
     def weekday(self):
         return self.__date.weekday()
@@ -1459,11 +1465,7 @@ class DateTime(with_metaclass(DateTimeType, object)):
         return self.__date.iso_calendar()
 
     def iso_format(self, sep="T"):
-        s = "%s%s%s" % (self.date().iso_format(), sep, self.time().iso_format())
-        if self.tzinfo is not None:
-            offset = self.tzinfo.utcoffset(self)
-            s += "%+03d:%02d" % divmod(offset.total_seconds() // 60, 60)
-        return s
+        return "%s%s%s" % (self.date().iso_format(), sep, self.timetz().iso_format())
 
     def __repr__(self):
         if self.tzinfo is None:
