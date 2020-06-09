@@ -25,6 +25,7 @@ a number of utility functions.
 
 from __future__ import division, print_function
 
+from decimal import Decimal
 from datetime import timedelta, date, time, datetime
 from functools import total_ordering
 from re import compile as re_compile
@@ -1115,8 +1116,9 @@ class Time(with_metaclass(TimeType, object)):
         return self.tzinfo.tzname(self)
 
     def to_clock_time(self):
-        seconds, nanoseconds = nano_divmod(self.ticks, 1)
-        return ClockTime(seconds, 1000000000 * nanoseconds)
+        seconds, nanoseconds = nano_divmod(self.ticks, 1)  # int, float
+        nanoseconds_int = int(Decimal(str(nanoseconds)) * 1000000000)  # Convert fractions to an integer without losing precision
+        return ClockTime(seconds, nanoseconds_int)
 
     def to_native(self):
         """ Convert to a native Python `datetime.time` value.
@@ -1434,8 +1436,9 @@ class DateTime(with_metaclass(DateTimeType, object)):
         for month in range(1, self.month):
             total_seconds += 86400 * Date.days_in_month(self.year, month)
         total_seconds += 86400 * (self.day - 1)
-        seconds, nanoseconds = nano_divmod(self.__time.ticks, 1)
-        return ClockTime(total_seconds + seconds, 1000000000 * nanoseconds)
+        seconds, nanoseconds = nano_divmod(self.__time.ticks, 1)  # int, float
+        nanoseconds_int = int(Decimal(str(nanoseconds)) * 1000000000)  # Convert fractions to an integer without losing precision
+        return ClockTime(total_seconds + seconds, nanoseconds_int)
 
     def to_native(self):
         """ Convert to a native Python `datetime.datetime` value.
