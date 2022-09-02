@@ -7,6 +7,15 @@ These classes comprise a similar set to that provided by the standard library ``
 Inspiration has also been drawn from `ISO-8601 <https://xkcd.com/1179/>`_.
 
 
+Archival Notice
+===============
+This project was born from the need to support nanoseconds in the 
+`Neo4j Python driver <https://github.com/neo4j/neo4j-python-driver/>`_.
+Since driver version 4.0, the temporal type implementations have been
+rolled into the driver project. Therefore, we decided to abandon this
+library.
+
+
 Overview
 ========
 
